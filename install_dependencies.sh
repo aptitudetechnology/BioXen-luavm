@@ -59,13 +59,43 @@ install_lua_ubuntu() {
     print_status "Installing Lua and dependencies on Ubuntu/Debian..."
     
     sudo apt update
-    sudo apt install -y lua5.4 lua5.4-dev luarocks build-essential
+    
+    # Try different Lua versions and development packages
+    if sudo apt install -y lua5.4 2>/dev/null; then
+        print_success "Installed Lua 5.4"
+        LUA_VERSION="lua5.4"
+    elif sudo apt install -y lua5.3 2>/dev/null; then
+        print_success "Installed Lua 5.3"
+        LUA_VERSION="lua5.3"
+    elif sudo apt install -y lua5.1 2>/dev/null; then
+        print_success "Installed Lua 5.1"
+        LUA_VERSION="lua5.1"
+    else
+        print_error "Failed to install any Lua version"
+        exit 1
+    fi
+    
+    # Install development headers if available
+    DEV_PACKAGE="${LUA_VERSION}-dev"
+    if sudo apt install -y "$DEV_PACKAGE" 2>/dev/null; then
+        print_success "Installed $DEV_PACKAGE"
+    else
+        print_warning "$DEV_PACKAGE not available, trying liblua${LUA_VERSION#lua}-dev"
+        if sudo apt install -y "liblua${LUA_VERSION#lua}-dev" 2>/dev/null; then
+            print_success "Installed liblua${LUA_VERSION#lua}-dev"
+        else
+            print_warning "No development headers found, continuing without them"
+        fi
+    fi
+    
+    # Install LuaRocks and build tools
+    sudo apt install -y luarocks build-essential
     
     # Create symlink if lua command doesn't exist
     if ! command_exists lua; then
-        if command_exists lua5.4; then
+        if command_exists "$LUA_VERSION"; then
             print_status "Creating symlink for lua command..."
-            sudo ln -sf /usr/bin/lua5.4 /usr/bin/lua
+            sudo ln -sf "/usr/bin/$LUA_VERSION" /usr/bin/lua
         fi
     fi
 }
