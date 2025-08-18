@@ -1,3 +1,4 @@
+
 """
 High-level VM manager for orchestrating multiple Lua VMs.
 
@@ -19,18 +20,18 @@ class VMManager:
 local socket = require("socket")
 local server = socket.bind("*", {port})
 if not server then
-    io.stderr:write("Lua Server: Failed to bind to port {port}\n")
+    io.stderr:write("Lua Server: Failed to bind to port {port}\\n")
     os.exit(1)
 end
 print("Lua Server: Listening on port {port}...")
 local client = server:accept()
 print("Lua Server: Client connected from " .. client:getpeername())
-client:send("Hello from Lua Server! What's your message?\n")
+client:send("Hello from Lua Server! What\\'s your message?\\n")
 local data, err = client:receive()
 if data then
     print("Lua Server: Received from client: " .. data)
 else
-    io.stderr:write("Lua Server: Error receiving data or client disconnected: " .. tostring(err) .. "\n")
+    io.stderr:write("Lua Server: Error receiving data or client disconnected: " .. tostring(err) .. "\\n")
 end
 client:close()
 server:close()
@@ -40,11 +41,14 @@ print("Lua Server: Connection closed.")
 
     def run_client(self, ip="localhost", port=8080, message="Greetings, Lua Server!"):
         """Start a Lua client VM to connect to a server."""
+        # Escape any quotes in the message
+        escaped_message = message.replace('"', '\\"').replace("'", "\\'")
+        
         lua_code = f'''
 local socket = require("socket")
 local client, err = socket.connect("{ip}", {port})
 if not client then
-    io.stderr:write("Lua Client: Failed to connect to {ip}:{port}: " .. tostring(err) .. "\n")
+    io.stderr:write("Lua Client: Failed to connect to {ip}:{port}: " .. tostring(err) .. "\\n")
     os.exit(1)
 end
 print("Lua Client: Connected to server at {ip}:{port}")
@@ -52,10 +56,10 @@ local response, err_recv = client:receive()
 if response then
     print("Lua Client: Received from server: " .. response)
 else
-    io.stderr:write("Lua Client: Error receiving initial message from server: " .. tostring(err_recv) .. "\n")
+    io.stderr:write("Lua Client: Error receiving initial message from server: " .. tostring(err_recv) .. "\\n")
 end
-client:send("{message}\n")
-print("Lua Client: Sent message: '{message}'")
+client:send("{escaped_message}\\n")
+print("Lua Client: Sent message: \\"{escaped_message}\\"")
 client:close()
 print("Lua Client: Connection closed.")
 '''
@@ -71,9 +75,9 @@ if peer_client then
     peer_client:settimeout(0.1)
     print("P2P VM: Connected to peer at {peer_ip}:{peer_port}")
     table.insert(sockets_to_monitor, peer_client)
-    peer_client:send("Hello from P2P VM on port {local_port}!\n")
+    peer_client:send("Hello from P2P VM on port {local_port}!\\n")
 else
-    io.stderr:write("P2P VM: Failed to connect to peer {peer_ip}:{peer_port}: " .. tostring(peer_err) .. "\n")
+    io.stderr:write("P2P VM: Failed to connect to peer {peer_ip}:{peer_port}: " .. tostring(peer_err) .. "\\n")
 end
 '''
         lua_code = f'''
@@ -81,7 +85,7 @@ local socket = require("socket")
 local local_port = {local_port}
 local server_socket = socket.bind("*", local_port)
 if not server_socket then
-    io.stderr:write("P2P VM: Failed to bind to local port " .. local_port .. "\n")
+    io.stderr:write("P2P VM: Failed to bind to local port " .. local_port .. "\\n")
     os.exit(1)
 end
 server_socket:settimeout(0.1)
@@ -96,7 +100,7 @@ local start_time = os.clock()
 while os.clock() - start_time < run_duration do
     local readable_sockets, _, err = socket.select(sockets_to_monitor, nil, 0.1)
     if err then
-        io.stderr:write("P2P VM: socket.select error: " .. tostring(err) .. "\n")
+        io.stderr:write("P2P VM: socket.select error: " .. tostring(err) .. "\\n")
         break
     end
     for i, sock in ipairs(readable_sockets) do
@@ -108,9 +112,9 @@ while os.clock() - start_time < run_duration do
                 print("P2P VM: Accepted connection from " .. peer_ip .. ":" .. peer_port)
                 table.insert(sockets_to_monitor, new_client)
                 connected_peers[new_client] = true
-                new_client:send("Welcome to P2P VM on port " .. local_port .. "!\n")
+                new_client:send("Welcome to P2P VM on port " .. local_port .. "!\\n")
             else
-                io.stderr:write("P2P VM: Error accepting new client: " .. tostring(new_client) .. "\n")
+                io.stderr:write("P2P VM: Error accepting new client: " .. tostring(new_client) .. "\\n")
             end
         else
             local data, recv_err, partial = sock:receive()
@@ -132,9 +136,9 @@ while os.clock() - start_time < run_duration do
     end
     if os.clock() - last_send_time > send_interval then
         for sock in pairs(connected_peers) do
-            local success, send_err = sock:send("P2P VM " .. local_port .. ": Heartbeat at " .. os.clock() .. "\n")
+            local success, send_err = sock:send("P2P VM " .. local_port .. ": Heartbeat at " .. os.clock() .. "\\n")
             if not success then
-                io.stderr:write("P2P VM: Error sending to " .. sock:getpeername() .. ": " .. tostring(send_err) .. "\n")
+                io.stderr:write("P2P VM: Error sending to " .. sock:getpeername() .. ": " .. tostring(send_err) .. "\\n")
             end
         end
         last_send_time = os.clock()
