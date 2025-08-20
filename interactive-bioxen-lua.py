@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
 """
-Interactive BioXen CLI using questionary for user-friendly VM management.
+Enhanced Interactive BioXen CLI with hypervisor-like VM management capabilities.
+Maintains existing functionality while adding persistent VM control.
 """
 
 import sys
+import os
+import time
+import threading
+import signal
+import termios
+import tty
+import select
 from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Optional
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
@@ -17,21 +27,416 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from pylua_vm import VMManager
+    from pylua_vm import VMManager, SessionManager, create_vm, InteractiveSession
+    from pylua_vm.exceptions import (
+        InteractiveSessionError, AttachError, DetachError, 
+        SessionNotFoundError, SessionAlreadyExistsError, 
+        VMManagerError, ProcessRegistryError
+    )
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you're running from the BioXen root directory")
     sys.exit(1)
 
-class InteractiveBioXen:
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich.live import Live
+    from rich.panel import Panel
+    from rich.text import Text
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
+    print("⚠️ 'rich' library not available. Install with: pip install rich for enhanced display")
+
+
+class VMStatus:
+    """VM status tracking"""
+    def __init__(self, vm_id: str, name: str, created_at: datetime, attached: bool = False):
+        self.vm_id = vm_id
+        self.name = name
+        self.created_at = created_at
+        self.attached = attached
+        self.last_activity = datetime.now()
+    
+    def update_activity(self):
+        self.last_activity = datetime.now()
+    
+    def get_uptime(self) -> str:
+        uptime = datetime.now() - self.created_at
+        hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours > 0:
+            return f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            return f"{minutes}m {seconds}s"
+        else:
+            return f"{seconds}s"
+
+
+class TerminalManager:
+    """Handles raw terminal mode for VM attachment"""
+    
+    def __init__(self):
+        self.original_attrs = None
+        self.raw_mode = False
+    
+    def enter_raw_mode(self):
+        """Enter raw terminal mode for direct VM interaction"""
+        if not sys.stdin.isatty():
+            return False
+        
+        try:
+            self.original_attrs = termios.tcgetattr(sys.stdin.fileno())
+            tty.setraw(sys.stdin.fileno())
+            self.raw_mode = True
+            return True
+        except Exception as e:
+            print(f"⚠️ Could not enter raw terminal mode: {e}")
+            return False
+    
+    def exit_raw_mode(self):
+        """Exit raw terminal mode"""
+        if self.raw_mode and self.original_attrs:
+            try:
+                termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.original_attrs)
+                self.raw_mode = False
+            except Exception as e:
+                print(f"⚠️ Could not restore terminal mode: {e}")
+    
+    def __enter__(self):
+        self.enter_raw_mode()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.exit_raw_mode()
+
+
+class EnhancedInteractiveBioXen:
+    """Enhanced Interactive BioXen with hypervisor-like VM management"""
+    
+    def __init__(self):
+        self.vm_manager = VMManager()
+        self.vm_status: Dict[str, VMStatus] = {}
+        self.console = Console() if RICH_AVAILABLE else None
+        self.terminal_manager = TerminalManager()
+        self.monitoring_active = False
+        self.monitor_thread = None
+        
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cleanup_all_vms()
+    
+    def cleanup_all_vms(self):
+        """Clean up all managed VMs on exit"""
+        for vm_id in list(self.vm_status.keys()):
+            try:
+                self.vm_manager.terminate_vm_session(vm_id)
+            except:
+                pass
+        self.vm_status.clear()
+    
+    # ============ HYPERVISOR COMMANDS ============
+    
+    def list_persistent_vms(self):
+        """List all running persistent VMs with status"""
+        print("\n" + "="*60)
+        print("🖥️  Persistent Lua VM Status")
+        print("="*60)
+        
+        if not self.vm_status:
+            print("📭 No persistent VMs running")
+            return
+        
+        if RICH_AVAILABLE and self.console:
+            table = Table(show_header=True, header_style="bold blue")
+            table.add_column("VM ID", style="cyan")
+            table.add_column("Name", style="green")
+            table.add_column("Status", style="yellow")
+            table.add_column("Uptime", style="magenta")
+            table.add_column("Attached", style="red")
+            table.add_column("Last Activity", style="dim")
+            
+            for vm_id, status in self.vm_status.items():
+                try:
+                    # Check if VM is actually alive
+                    sessions = self.vm_manager.session_manager.list_sessions()
+                    vm_alive = vm_id in sessions
+                    status_text = "🟢 Running" if vm_alive else "🔴 Dead"
+                    
+                    attached_text = "🔗 Yes" if status.attached else "➖ No"
+                    last_activity = status.last_activity.strftime("%H:%M:%S")
+                    
+                    table.add_row(
+                        vm_id,
+                        status.name,
+                        status_text,
+                        status.get_uptime(),
+                        attached_text,
+                        last_activity
+                    )
+                except Exception as e:
+                    table.add_row(
+                        vm_id,
+                        status.name,
+                        f"🔴 Error: {e}",
+                        "N/A",
+                        "N/A",
+                        "N/A"
+                    )
+            
+            self.console.print(table)
+        else:
+            # Fallback text display
+            for vm_id, status in self.vm_status.items():
+                try:
+                    sessions = self.vm_manager.session_manager.list_sessions()
+                    vm_alive = vm_id in sessions
+                    status_text = "Running" if vm_alive else "Dead"
+                    
+                    print(f"VM ID: {vm_id}")
+                    print(f"  Name: {status.name}")
+                    print(f"  Status: {status_text}")
+                    print(f"  Uptime: {status.get_uptime()}")
+                    print(f"  Attached: {'Yes' if status.attached else 'No'}")
+                    print(f"  Last Activity: {status.last_activity.strftime('%H:%M:%S')}")
+                    print()
+                except Exception as e:
+                    print(f"VM ID: {vm_id} - Error: {e}")
+    
+    def start_persistent_vm(self):
+        """Start a new persistent Lua VM"""
+        print("\n🚀 Start Persistent Lua VM")
+        
+        vm_id = questionary.text("Enter VM ID (unique identifier):", 
+                                validate=lambda x: x and x not in self.vm_status or "VM ID already exists or empty").ask()
+        if not vm_id:
+            return
+        
+        vm_name = questionary.text(f"Enter VM name (display name):", default=f"LuaVM-{vm_id}").ask()
+        if not vm_name:
+            vm_name = f"LuaVM-{vm_id}"
+        
+        networked = questionary.confirm("Enable networking capabilities?", default=False).ask()
+        
+        try:
+            print(f"🔄 Creating persistent VM '{vm_id}'...")
+            
+            if networked:
+                # Create networked VM
+                vm_instance = create_vm(vm_id, networked=True)
+                # Convert to interactive session
+                session = self.vm_manager.create_interactive_vm(f"{vm_id}_interactive")
+                actual_vm_id = f"{vm_id}_interactive"
+            else:
+                # Create interactive VM directly
+                session = self.vm_manager.create_interactive_vm(vm_id)
+                actual_vm_id = vm_id
+            
+            # Register VM status
+            self.vm_status[actual_vm_id] = VMStatus(actual_vm_id, vm_name, datetime.now())
+            
+            # Send initial setup commands
+            self.vm_manager.send_input(actual_vm_id, "print('Persistent VM started. Type Lua commands here.')\n")
+            time.sleep(0.2)
+            
+            print(f"✅ Persistent VM '{actual_vm_id}' started successfully!")
+            print(f"💡 Use 'Attach to VM Terminal' to interact with it.")
+            
+        except Exception as e:
+            print(f"❌ Failed to start persistent VM: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def attach_to_vm_terminal(self):
+        """Attach to a persistent VM's terminal"""
+        if not self.vm_status:
+            print("📭 No persistent VMs available")
+            return
+        
+        choices = [Choice(f"{vm_id} ({status.name})", vm_id) for vm_id, status in self.vm_status.items()]
+        choices.append(Choice("← Back to Menu", "back"))
+        
+        vm_id = questionary.select("Select VM to attach to:", choices=choices).ask()
+        
+        if not vm_id or vm_id == "back":
+            return
+        
+        try:
+            print(f"\n🔗 Attaching to VM '{vm_id}'...")
+            print("💡 Press Ctrl+D or type 'exit' to detach and return to menu")
+            print("💡 The VM will continue running after detachment")
+            print("-" * 60)
+            
+            # Mark as attached
+            self.vm_status[vm_id].attached = True
+            self.vm_status[vm_id].update_activity()
+            
+            # Attach to the VM
+            self.vm_manager.attach_to_vm(vm_id)
+            
+            # Start interactive terminal session
+            self._run_interactive_terminal(vm_id)
+            
+        except SessionNotFoundError:
+            print(f"❌ VM '{vm_id}' not found. It may have been terminated.")
+            # Clean up dead VM from status
+            if vm_id in self.vm_status:
+                del self.vm_status[vm_id]
+        except Exception as e:
+            print(f"❌ Failed to attach to VM: {e}")
+        finally:
+            # Mark as detached
+            if vm_id in self.vm_status:
+                self.vm_status[vm_id].attached = False
+    
+    def _run_interactive_terminal(self, vm_id: str):
+        """Run interactive terminal session with VM"""
+        try:
+            print(f"🖥️  Interactive terminal for VM '{vm_id}' (Ctrl+D to exit)")
+            
+            while True:
+                try:
+                    # Get user input
+                    user_input = input("lua> ")
+                    
+                    # Check for exit commands
+                    if user_input.lower() in ['exit', 'quit', ':q']:
+                        break
+                    
+                    if user_input.strip():
+                        # Send input to VM
+                        self.vm_manager.send_input(vm_id, user_input + "\n")
+                        self.vm_status[vm_id].update_activity()
+                        
+                        # Wait a bit for output
+                        time.sleep(0.1)
+                        
+                        # Read and display output
+                        output = self.vm_manager.read_output(vm_id)
+                        if output:
+                            # Clean up the output
+                            clean_output = output.strip()
+                            if clean_output:
+                                print(clean_output)
+                
+                except EOFError:  # Ctrl+D
+                    break
+                except KeyboardInterrupt:  # Ctrl+C
+                    print("\n💡 Use Ctrl+D or 'exit' to detach from VM")
+                    continue
+            
+            # Detach from VM
+            self.vm_manager.detach_from_vm(vm_id)
+            print(f"\n↩️  Detached from VM '{vm_id}' (VM continues running)")
+            
+        except Exception as e:
+            print(f"\n❌ Terminal session error: {e}")
+    
+    def detach_from_vm(self):
+        """Detach from currently attached VM"""
+        attached_vms = [vm_id for vm_id, status in self.vm_status.items() if status.attached]
+        
+        if not attached_vms:
+            print("📭 No VMs currently attached")
+            return
+        
+        choices = [Choice(f"{vm_id} ({self.vm_status[vm_id].name})", vm_id) for vm_id in attached_vms]
+        
+        vm_id = questionary.select("Select VM to detach from:", choices=choices).ask()
+        
+        if vm_id:
+            try:
+                self.vm_manager.detach_from_vm(vm_id)
+                self.vm_status[vm_id].attached = False
+                print(f"↩️  Detached from VM '{vm_id}'")
+            except Exception as e:
+                print(f"❌ Failed to detach from VM: {e}")
+    
+    def stop_persistent_vm(self):
+        """Stop and remove a persistent VM"""
+        if not self.vm_status:
+            print("📭 No persistent VMs to stop")
+            return
+        
+        choices = [Choice(f"{vm_id} ({status.name})", vm_id) for vm_id, status in self.vm_status.items()]
+        choices.append(Choice("← Back to Menu", "back"))
+        
+        vm_id = questionary.select("Select VM to stop:", choices=choices).ask()
+        
+        if not vm_id or vm_id == "back":
+            return
+        
+        confirm = questionary.confirm(f"Stop VM '{vm_id}' permanently?", default=False).ask()
+        if not confirm:
+            return
+        
+        try:
+            self.vm_manager.terminate_vm_session(vm_id)
+            del self.vm_status[vm_id]
+            print(f"🛑 VM '{vm_id}' stopped successfully")
+        except Exception as e:
+            print(f"❌ Failed to stop VM: {e}")
+            # Clean up from status anyway
+            if vm_id in self.vm_status:
+                del self.vm_status[vm_id]
+    
+    def show_vm_detailed_status(self):
+        """Show detailed status for a specific VM"""
+        if not self.vm_status:
+            print("📭 No persistent VMs available")
+            return
+        
+        choices = [Choice(f"{vm_id} ({status.name})", vm_id) for vm_id, status in self.vm_status.items()]
+        choices.append(Choice("← Back to Menu", "back"))
+        
+        vm_id = questionary.select("Select VM for detailed status:", choices=choices).ask()
+        
+        if not vm_id or vm_id == "back":
+            return
+        
+        status = self.vm_status[vm_id]
+        
+        print("\n" + "="*60)
+        print(f"📊 Detailed Status for VM '{vm_id}'")
+        print("="*60)
+        
+        try:
+            sessions = self.vm_manager.session_manager.list_sessions()
+            vm_alive = vm_id in sessions
+            
+            print(f"VM ID: {vm_id}")
+            print(f"Name: {status.name}")
+            print(f"Status: {'🟢 Running' if vm_alive else '🔴 Dead'}")
+            print(f"Created: {status.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"Uptime: {status.get_uptime()}")
+            print(f"Currently Attached: {'🔗 Yes' if status.attached else '➖ No'}")
+            print(f"Last Activity: {status.last_activity.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            if vm_alive:
+                # Try to get some runtime info
+                try:
+                    self.vm_manager.send_input(vm_id, "print('Status check:', os.date())\n")
+                    time.sleep(0.1)
+                    output = self.vm_manager.read_output(vm_id)
+                    if output:
+                        print(f"Last Response: {output.strip()}")
+                except:
+                    print("Last Response: Unable to query")
+            
+        except Exception as e:
+            print(f"❌ Error getting VM status: {e}")
+    
+    # ============ ORIGINAL FUNCTIONALITY ============
+    
     def create_lua_vm(self):
-        """
-        High-level Lua VM orchestration using VMManager from vm_manager.py.
-        """
-        from vm_manager import VMManager
-        print("\n🌙 Create Lua VM (VMManager)")
-        print("💡 This option uses the VMManager library for robust Lua VM orchestration.")
-        print("    Make sure 'lua' and 'luasocket' are installed for networking features.")
+        """Original VM creation functionality - maintained for compatibility"""
+        print("\n🌙 Create Lua VM (One-shot Execution)")
+        print("💡 This option uses one-time VM execution (original functionality).")
+        print("    For persistent VMs, use 'Start Persistent VM' option.")
 
         vm_manager = VMManager()
 
@@ -143,37 +548,101 @@ class InteractiveBioXen:
             questionary.press_any_key_to_continue().ask()
 
     def main_menu(self):
-        """Display and handle the main menu."""
-        while True:
-            print("\n" + "="*60)
-            print("🌙 Lua VM Manager - Interactive Interface")
-            print("="*60)
-            
-            choices = [
-                Choice("🌙 Create Lua VM", "create_lua_vm"),
-                Choice("❌ Exit", "exit"),
-            ]
-            
-            action = questionary.select(
-                "What would you like to do?",
-                choices=choices,
-                use_shortcuts=True
-            ).ask()
-            
-            if action is None or action == "exit":
-                print("👋 Goodbye!")
-                break
-            
-            try:
-                if action == "create_lua_vm":
-                    self.create_lua_vm()
-            except KeyboardInterrupt:
-                print("\n\n⚠️ Operation cancelled by user")
-                continue
-            except Exception as e:
-                print(f"\n❌ Error: {e}")
-                questionary.press_any_key_to_continue().ask()
+        """Enhanced main menu with hypervisor commands"""
+        try:
+            while True:
+                print("\n" + "="*70)
+                print("🌙 BioXen Lua VM Manager - Enhanced Hypervisor Interface")
+                print("="*70)
+                
+                # Show quick status
+                if self.vm_status:
+                    running_count = len(self.vm_status)
+                    attached_count = sum(1 for status in self.vm_status.values() if status.attached)
+                    print(f"📊 Status: {running_count} VMs running, {attached_count} attached")
+                    print("-" * 70)
+                
+                choices = [
+                    # Hypervisor commands
+                    Choice("🖥️  List Persistent VMs", "list_vms"),
+                    Choice("🚀 Start Persistent VM", "start_vm"),
+                    Choice("🔗 Attach to VM Terminal", "attach_vm"),
+                    Choice("↩️  Detach from VM", "detach_vm"),
+                    Choice("🛑 Stop Persistent VM", "stop_vm"),
+                    Choice("📊 VM Detailed Status", "vm_status"),
+                    Choice("────────────────────", "separator"),
+                    # Original functionality
+                    Choice("🌙 One-shot Lua VM (Original)", "create_lua_vm"),
+                    Choice("────────────────────", "separator2"),
+                    Choice("❌ Exit", "exit"),
+                ]
+                
+                action = questionary.select(
+                    "Select an action:",
+                    choices=choices,
+                    use_shortcuts=True
+                ).ask()
+                
+                if action is None or action == "exit":
+                    print("🛑 Stopping all persistent VMs...")
+                    self.cleanup_all_vms()
+                    print("👋 Goodbye!")
+                    break
+                
+                # Handle separator selections
+                if action in ["separator", "separator2"]:
+                    continue
+                
+                try:
+                    if action == "list_vms":
+                        self.list_persistent_vms()
+                    elif action == "start_vm":
+                        self.start_persistent_vm()
+                    elif action == "attach_vm":
+                        self.attach_to_vm_terminal()
+                    elif action == "detach_vm":
+                        self.detach_from_vm()
+                    elif action == "stop_vm":
+                        self.stop_persistent_vm()
+                    elif action == "vm_status":
+                        self.show_vm_detailed_status()
+                    elif action == "create_lua_vm":
+                        self.create_lua_vm()
+                        
+                except KeyboardInterrupt:
+                    print("\n\n⚠️ Operation cancelled by user")
+                    continue
+                except Exception as e:
+                    print(f"\n❌ Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+                
+                if action != "attach_vm":  # Don't pause after attach (it handles its own flow)
+                    questionary.press_any_key_to_continue().ask()
+        
+        except KeyboardInterrupt:
+            print("\n\n🛑 Shutting down...")
+            self.cleanup_all_vms()
+        except Exception as e:
+            print(f"\n❌ Fatal error: {e}")
+            self.cleanup_all_vms()
+
+
+def signal_handler(signum, frame):
+    """Handle Ctrl+C gracefully"""
+    print("\n🛑 Received shutdown signal...")
+    sys.exit(0)
+
 
 if __name__ == "__main__":
-    cli = InteractiveBioXen()
-    cli.main_menu()
+    # Set up signal handling
+    signal.signal(signal.SIGINT, signal_handler)
+    
+    print("🌙 Starting Enhanced BioXen Lua VM Manager...")
+    
+    try:
+        with EnhancedInteractiveBioXen() as cli:
+            cli.main_menu()
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
+        sys.exit(1)

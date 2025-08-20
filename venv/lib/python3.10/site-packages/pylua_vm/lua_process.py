@@ -7,12 +7,12 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Optional, Union, Dict, Any
-
 from .exceptions import (
     LuaProcessError, 
     LuaNotFoundError, 
     ScriptGenerationError
 )
+from .interactive_session import InteractiveSession
 
 
 class LuaProcess:
@@ -34,9 +34,39 @@ class LuaProcess:
         self.name = name
         self.lua_executable = lua_executable
         self._temp_scripts = []  # Track temporary script files for cleanup
+        self._interactive_session: Optional[InteractiveSession] = None
         
         # Verify Lua is available
         self._verify_lua_available()
+    # --- Interactive Session Methods ---
+    def start_interactive_session(self):
+        """Start a persistent interactive Lua interpreter session."""
+        if self._interactive_session and self._interactive_session.is_running():
+            raise LuaProcessError("Interactive session already running")
+        self._interactive_session = InteractiveSession(lua_executable=self.lua_executable, name=self.name)
+        self._interactive_session.start()
+
+    def stop_interactive_session(self):
+        """Stop the interactive Lua interpreter session."""
+        if self._interactive_session:
+            self._interactive_session.stop()
+            self._interactive_session = None
+
+    def send_input(self, input_str: str):
+        """Send input to the interactive Lua interpreter session."""
+        if not self._interactive_session or not self._interactive_session.is_running():
+            raise LuaProcessError("Interactive session not running")
+        self._interactive_session.send_input(input_str)
+
+    def read_output(self, timeout: float = 0.1) -> Optional[str]:
+        """Read output from the interactive Lua interpreter session."""
+        if not self._interactive_session or not self._interactive_session.is_running():
+            raise LuaProcessError("Interactive session not running")
+        return self._interactive_session.read_output(timeout=timeout)
+
+    def is_interactive_running(self) -> bool:
+        """Check if the interactive session is running."""
+        return self._interactive_session is not None and self._interactive_session.is_running()
     
     def _verify_lua_available(self) -> None:
         """Check if Lua interpreter is available in PATH."""
@@ -69,7 +99,6 @@ class LuaProcess:
             raise ValueError("Lua code cannot be empty")
         
         command = [self.lua_executable, "-e", lua_code]
-        
         try:
             result = subprocess.run(
                 command,
@@ -78,14 +107,12 @@ class LuaProcess:
                 check=False,
                 timeout=timeout
             )
-            
             return {
                 'stdout': result.stdout.strip() if result.stdout else "",
                 'stderr': result.stderr.strip() if result.stderr else "",
                 'return_code': result.returncode,
                 'success': result.returncode == 0
             }
-            
         except subprocess.TimeoutExpired:
             raise LuaProcessError(f"Lua execution timed out after {timeout} seconds")
         except Exception as e:
@@ -185,6 +212,9 @@ class LuaProcess:
         """Clean up all temporary script files."""
         for script_path in self._temp_scripts[:]:  # Copy list to avoid modification during iteration
             self._cleanup_temp_script(script_path)
+        if self._interactive_session:
+            self._interactive_session.stop()
+            self._interactive_session = None
     
     def __del__(self):
         """Ensure cleanup on object destruction."""
