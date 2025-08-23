@@ -1,5 +1,6 @@
+
 # test_intest_pylua-bioxen-vm.py
-from pylua_vm import VMManager, create_vm
+from pylua_bioxen_vm_lib import VMManager, create_vm
 
 print("Testing   installation...")
 
