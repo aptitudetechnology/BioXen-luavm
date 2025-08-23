@@ -5,6 +5,136 @@ UPGRADED for pylua_bioxen_vm_lib v0.1.6 with curator package management system.
 Maintains existing functionality while adding intelligent package curation.
 """
 
+# Proper import block
+import sys
+import os
+import time
+import threading
+import signal
+import termios
+import tty
+import select
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent / 'src'))
+
+try:
+    import questionary
+    from questionary import Choice
+except ImportError:
+    print("❌ questionary not installed. Install with: pip install questionary")
+    sys.exit(1)
+
+try:
+    # New v0.1.6 imports with curator system
+    from pylua_bioxen_vm_lib import VMManager, InteractiveSession, SessionManager
+    from pylua_bioxen_vm_lib.vm_manager import VMCluster
+    from pylua_bioxen_vm_lib.networking import NetworkedLuaVM, validate_host, validate_port
+    from pylua_bioxen_vm_lib.lua_process import LuaProcess
+    from pylua_bioxen_vm_lib.exceptions import (
+        InteractiveSessionError, AttachError, DetachError, 
+        SessionNotFoundError, SessionAlreadyExistsError, 
+        VMManagerError, ProcessRegistryError, LuaProcessError,
+        NetworkingError, LuaVMError
+    )
+    # Curator system imports
+    from pylua_bioxen_vm_lib.utils.curator import (
+        Curator, get_curator, bootstrap_lua_environment, Package
+    )
+    from pylua_bioxen_vm_lib.env import EnvironmentManager
+except ImportError as e:
+    print(f"❌ Import error: {e}")
+    print("Make sure pylua_bioxen_vm_lib>=0.1.6 is installed:")
+    print("  pip install --upgrade pylua_bioxen_vm_lib")
+    sys.exit(1)
+
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich.live import Live
+    from rich.panel import Panel
+    from rich.text import Text
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
+    print("⚠️ 'rich' library not available. Install with: pip install rich for enhanced display")
+
+
+# BioXen-specific package collections
+BIOXEN_PACKAGES = {
+    "bio-utils": Package("bio-utils", category="biology", priority=9,
+                        description="Essential biological data processing utilities"),
+    "sequence-parser": Package("sequence-parser", category="biology", priority=8,
+                              description="DNA/RNA/protein sequence parsing and analysis"),
+    "phylo-tree": Package("phylo-tree", category="biology", priority=7,
+                         description="Phylogenetic tree construction and analysis"),
+    "blast-parser": Package("blast-parser", category="biology", priority=6,
+                           description="BLAST output parsing and analysis"),
+    "genome-tools": Package("genome-tools", category="biology", priority=7,
+                           description="Genome assembly and annotation tools"),
+    "protein-fold": Package("protein-fold", category="biology", priority=5,
+                           description="Protein structure prediction utilities"),
+}
+
+# BioXen environment profiles
+BIOXEN_PROFILES = {
+    "bioxen-minimal": {
+        "packages": ["lua-cjson", "luafilesystem", "bio-utils"],
+        "description": "Minimal BioXen environment with core biological tools"
+    },
+    "bioxen-standard": {
+        "packages": ["lua-cjson", "luafilesystem", "bio-utils", "sequence-parser", "phylo-tree"],
+        "description": "Standard BioXen environment with common biological analysis tools"
+    },
+    "bioxen-full": {
+        "packages": ["lua-cjson", "luafilesystem", "bio-utils", "sequence-parser", "phylo-tree", 
+                    "blast-parser", "genome-tools", "protein-fold"],
+        "description": "Full BioXen environment with all available biological tools"
+    }
+}
+
+
+@dataclass
+class VMStatus:
+    """Track status of persistent VMs with curator information"""
+    vm_id: str
+    name: str
+    created_at: datetime
+    profile: str = "standard"
+    packages_installed: int = 0
+    curator_health: Optional[Dict[str, Any]] = None
+    attached: bool = False
+    
+    def get_uptime(self) -> str:
+        delta = datetime.now() - self.created_at
+        hours = delta.seconds // 3600
+        minutes = (delta.seconds % 3600) // 60
+        return f"{delta.days}d {hours}h {minutes}m"
+
+
+class TerminalManager:
+    """Manage terminal settings for interactive sessions"""
+    
+    def __init__(self):
+        self.original_settings = None
+    
+    def setup_raw_terminal(self):
+        """Setup terminal for raw input"""
+        if sys.stdin.isatty():
+            self.original_settings = termios.tcgetattr(sys.stdin)
+            tty.setraw(sys.stdin.fileno())
+    
+    def restore_terminal(self):
+        """Restore original terminal settings"""
+        if self.original_settings and sys.stdin.isatty():
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.original_settings)
+
+
 class EnhancedInteractiveBioXen:
     """Enhanced Interactive BioXen with hypervisor-like VM management, persistent VM control, and curator integration"""
 
@@ -48,234 +178,6 @@ class EnhancedInteractiveBioXen:
             print(f"🐍 Lua version: {health.get('lua_version', 'unknown')}")
         except Exception as e:
             print(f"⚠️ Environment validation error: {e}")
-    RICH_AVAILABLE = True
-except ImportError:
-    RICH_AVAILABLE = False
-    print("⚠️ 'rich' library not available. Install with: pip install rich for enhanced display")
-
-
-# BioXen-specific package collections
-BIOXEN_PACKAGES = {
-    "bio-utils": Package("bio-utils", category="biology", priority=9,
-                        description="Essential biological data processing utilities"),
-    "sequence-parser": Package("sequence-parser", category="biology", priority=8,
-                              description="DNA/RNA/protein sequence parsing and analysis"),
-    "phylo-tree": Package("phylo-tree", category="biology", priority=7,
-                         description="Phylogenetic tree construction and analysis"),
-    "blast-parser": Package("blast-parser", category="biology", priority=6,
-                           description="BLAST output parsing and analysis"),
-    "genome-tools": Package("genome-tools", category="biology", priority=7,
-                           description="Genome assembly and annotation tools"),
-    "protein-fold": Package("protein-fold", category="biology", priority=5,
-                           description="Protein structure prediction utilities"),
-}
-
-# BioXen environment profiles
-BIOXEN_PROFILES = {
-    "bioxen-minimal": {
-        "packages": ["lua-cjson", "luafilesystem", "bio-utils"],
-        "description": "Minimal BioXen environment with core biological tools"
-    },
-
-    # Proper import block
-    import sys
-    import os
-    import time
-    import threading
-    import signal
-    import termios
-    import tty
-    import select
-    from pathlib import Path
-    from datetime import datetime
-    from typing import Dict, List, Optional, Any
-    from dataclasses import dataclass
-
-    # Add src to path for imports
-    sys.path.insert(0, str(Path(__file__).parent / 'src'))
-
-    try:
-        import questionary
-        from questionary import Choice
-    except ImportError:
-        print("❌ questionary not installed. Install with: pip install questionary")
-
-        # Proper import block
-        import sys
-        import os
-        import time
-        import threading
-        import signal
-        import termios
-        import tty
-        import select
-        from pathlib import Path
-        from datetime import datetime
-        from typing import Dict, List, Optional, Any
-        from dataclasses import dataclass
-
-        # Add src to path for imports
-        sys.path.insert(0, str(Path(__file__).parent / 'src'))
-
-        try:
-            import questionary
-            from questionary import Choice
-        except ImportError:
-            print("❌ questionary not installed. Install with: pip install questionary")
-
-            # Proper import block
-            import sys
-            import os
-            import time
-            import threading
-            import signal
-            import termios
-            import tty
-            import select
-            from pathlib import Path
-            from datetime import datetime
-            from typing import Dict, List, Optional, Any
-            from dataclasses import dataclass
-
-            # Add src to path for imports
-            sys.path.insert(0, str(Path(__file__).parent / 'src'))
-
-            try:
-                import questionary
-                from questionary import Choice
-            except ImportError:
-                print("❌ questionary not installed. Install with: pip install questionary")
-                sys.exit(1)
-
-            try:
-                # New v0.1.6 imports with curator system
-                from pylua_bioxen_vm_lib import VMManager, InteractiveSession, SessionManager
-                from pylua_bioxen_vm_lib.vm_manager import VMCluster
-                from pylua_bioxen_vm_lib.networking import NetworkedLuaVM, validate_host, validate_port
-                from pylua_bioxen_vm_lib.lua_process import LuaProcess
-                from pylua_bioxen_vm_lib.exceptions import (
-                    InteractiveSessionError, AttachError, DetachError, 
-                    SessionNotFoundError, SessionAlreadyExistsError, 
-                    VMManagerError, ProcessRegistryError, LuaProcessError,
-                    NetworkingError, LuaVMError
-                )
-                # Curator system imports
-                from pylua_bioxen_vm_lib.utils.curator import (
-                    Curator, get_curator, bootstrap_lua_environment, Package
-                )
-                from pylua_bioxen_vm_lib.env import EnvironmentManager
-            except ImportError as e:
-                print(f"❌ Import error: {e}")
-                print("Make sure pylua_bioxen_vm_lib>=0.1.6 is installed:")
-                print("  pip install --upgrade pylua_bioxen_vm_lib")
-                sys.exit(1)
-
-            try:
-                from rich.console import Console
-                from rich.table import Table
-                from rich.live import Live
-                from rich.panel import Panel
-                from rich.text import Text
-                from rich.progress import Progress, SpinnerColumn, TextColumn
-                RICH_AVAILABLE = True
-            except ImportError:
-                RICH_AVAILABLE = False
-                print("⚠️ 'rich' library not available. Install with: pip install rich for enhanced display")
-
-            # ...existing code...
-            def main_menu(self):
-                """Enhanced main menu with hypervisor and package management commands"""
-                try:
-                    while True:
-                        print("\n" + "="*70)
-                        print("🌙 BioXen Lua VM Manager - Enhanced Hypervisor & Package Management Interface")
-                        print("="*70)
-
-                        # Show quick status
-                        if self.vm_status:
-                            running_count = len(self.vm_status)
-                            attached_count = sum(1 for status in self.vm_status.values() if status.attached)
-                            print(f"📊 Status: {running_count} VMs running, {attached_count} attached")
-                            print("-" * 70)
-
-                        choices = [
-                            # Hypervisor commands
-                            Choice("🖥️  List Persistent VMs", "list_vms"),
-                            Choice("🚀 Start Persistent VM", "start_vm"),
-                            Choice("🔗 Attach to VM Terminal", "attach_vm"),
-                            Choice("↩️  Detach from VM", "detach_vm"),
-                            Choice("🛑 Stop Persistent VM", "stop_vm"),
-                            Choice("📊 VM Detailed Status", "vm_status"),
-                            Choice("────────────────────", "separator"),
-                            # Package management commands
-                            Choice("🌱 Show Environment & Package Status", "env_status"),
-                            Choice("🎯 Setup Environment Profile", "setup_profile"),
-                            Choice("📦 Install Packages", "install_packages"),
-                            Choice("────────────────────", "separator2"),
-                            # Original functionality
-                            Choice("🌙 One-shot Lua VM (Original)", "create_lua_vm"),
-                            Choice("────────────────────", "separator3"),
-                            Choice("❌ Exit", "exit"),
-                        ]
-
-                        action = questionary.select(
-                            "Select an action:",
-                            choices=choices,
-                            use_shortcuts=True
-                        ).ask()
-
-                        if action is None or action == "exit":
-                            print("🛑 Stopping all persistent VMs...")
-                            self.cleanup_all_vms()
-                            print("👋 Goodbye!")
-                            break
-
-                        # Handle separator selections
-                        if action in ["separator", "separator2", "separator3"]:
-                            continue
-
-                        try:
-                            if action == "list_vms":
-                                self.list_persistent_vms()
-                            elif action == "start_vm":
-                                self.start_persistent_vm()
-                            elif action == "attach_vm":
-                                self.attach_to_vm_terminal()
-                            elif action == "detach_vm":
-                                self.detach_from_vm()
-                            elif action == "stop_vm":
-                                self.stop_persistent_vm()
-                            elif action == "vm_status":
-                                self.show_vm_detailed_status()
-                            elif action == "env_status":
-                                self.show_environment_status()
-                            elif action == "setup_profile":
-                                self.setup_environment_profile()
-                            elif action == "install_packages":
-                                self.install_packages()
-                            elif action == "create_lua_vm":
-                                self.create_lua_vm()
-
-                        except KeyboardInterrupt:
-                            print("\n\n⚠️ Operation cancelled by user")
-                            continue
-                        except Exception as e:
-                            print(f"\n❌ Error: {e}")
-                            import traceback
-                            traceback.print_exc()
-
-                        if action not in ["attach_vm", "env_status", "setup_profile", "install_packages"]:
-                            questionary.press_any_key_to_continue().ask()
-
-                except KeyboardInterrupt:
-                    print("\n\n🛑 Shutting down...")
-                    self.cleanup_all_vms()
-                except Exception as e:
-                    print(f"\n❌ Fatal error: {e}")
-                    self.cleanup_all_vms()
-            
-        except Exception as e:
-            print(f"⚠️ Environment validation error: {e}")
     
     def __enter__(self):
         return self
@@ -291,6 +193,97 @@ BIOXEN_PROFILES = {
             except:
                 pass
         self.vm_status.clear()
+    
+    def main_menu(self):
+        """Enhanced main menu with hypervisor and package management commands"""
+        try:
+            while True:
+                print("\n" + "="*70)
+                print("🌙 BioXen Lua VM Manager - Enhanced Hypervisor & Package Management Interface")
+                print("="*70)
+
+                # Show quick status
+                if self.vm_status:
+                    running_count = len(self.vm_status)
+                    attached_count = sum(1 for status in self.vm_status.values() if status.attached)
+                    print(f"📊 Status: {running_count} VMs running, {attached_count} attached")
+                    print("-" * 70)
+
+                choices = [
+                    # Hypervisor commands
+                    Choice("🖥️  List Persistent VMs", "list_vms"),
+                    Choice("🚀 Start Persistent VM", "start_vm"),
+                    Choice("🔗 Attach to VM Terminal", "attach_vm"),
+                    Choice("↩️  Detach from VM", "detach_vm"),
+                    Choice("🛑 Stop Persistent VM", "stop_vm"),
+                    Choice("📊 VM Detailed Status", "vm_status"),
+                    Choice("────────────────────", "separator"),
+                    # Package management commands
+                    Choice("🌱 Show Environment & Package Status", "env_status"),
+                    Choice("🎯 Setup Environment Profile", "setup_profile"),
+                    Choice("📦 Install Packages", "install_packages"),
+                    Choice("────────────────────", "separator2"),
+                    # Original functionality
+                    Choice("🌙 One-shot Lua VM (Original)", "create_lua_vm"),
+                    Choice("────────────────────", "separator3"),
+                    Choice("❌ Exit", "exit"),
+                ]
+
+                action = questionary.select(
+                    "Select an action:",
+                    choices=choices,
+                    use_shortcuts=True
+                ).ask()
+
+                if action is None or action == "exit":
+                    print("🛑 Stopping all persistent VMs...")
+                    self.cleanup_all_vms()
+                    print("👋 Goodbye!")
+                    break
+
+                # Handle separator selections
+                if action in ["separator", "separator2", "separator3"]:
+                    continue
+
+                try:
+                    if action == "list_vms":
+                        self.list_persistent_vms()
+                    elif action == "start_vm":
+                        self.start_persistent_vm()
+                    elif action == "attach_vm":
+                        self.attach_to_vm_terminal()
+                    elif action == "detach_vm":
+                        self.detach_from_vm()
+                    elif action == "stop_vm":
+                        self.stop_persistent_vm()
+                    elif action == "vm_status":
+                        self.show_vm_detailed_status()
+                    elif action == "env_status":
+                        self.show_environment_status()
+                    elif action == "setup_profile":
+                        self.setup_environment_profile()
+                    elif action == "install_packages":
+                        self.install_packages()
+                    elif action == "create_lua_vm":
+                        self.create_lua_vm()
+
+                except KeyboardInterrupt:
+                    print("\n\n⚠️ Operation cancelled by user")
+                    continue
+                except Exception as e:
+                    print(f"\n❌ Error: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+                if action not in ["attach_vm", "env_status", "setup_profile", "install_packages"]:
+                    questionary.press_any_key_to_continue().ask()
+
+        except KeyboardInterrupt:
+            print("\n\n🛑 Shutting down...")
+            self.cleanup_all_vms()
+        except Exception as e:
+            print(f"\n❌ Fatal error: {e}")
+            self.cleanup_all_vms()
     
     # ============ NEW CURATOR COMMANDS ============
     
@@ -673,6 +666,98 @@ print('🌙 BioXen VM ready! Profile: {selected_profile}')
             import traceback
             traceback.print_exc()
     
+    def attach_to_vm_terminal(self):
+        """Attach to a persistent VM's terminal"""
+        if not self.vm_status:
+            print("📭 No persistent VMs available")
+            return
+        
+        choices = [Choice(f"{vm_id} ({status.name}) - {status.profile}", vm_id) 
+                  for vm_id, status in self.vm_status.items()]
+        choices.append(Choice("← Back to Menu", "back"))
+        
+        vm_id = questionary.select("Select VM to attach to:", choices=choices).ask()
+        
+        if not vm_id or vm_id == "back":
+            return
+        
+        try:
+            print(f"\n🔗 Attaching to VM '{vm_id}' (Profile: {self.vm_status[vm_id].profile})")
+            print("💡 Press Ctrl+D or type 'exit' to detach and return to menu")
+            print("💡 The VM will continue running after detachment")
+            print("💡 BioXen packages are available for use")
+            print("-" * 70)
+            
+            # Mark as attached
+            self.vm_status[vm_id].attached = True
+            
+            # Attach to the VM session
+            session = self.vm_manager.attach_interactive_session(vm_id)
+            
+            print(f"🔗 Successfully attached to VM '{vm_id}'")
+            print("Type your Lua commands. VM will continue running when you detach.")
+            
+        except Exception as e:
+            print(f"❌ Failed to attach to VM: {e}")
+            self.vm_status[vm_id].attached = False
+    
+    def detach_from_vm(self):
+        """Detach from currently attached VM"""
+        attached_vms = [vm_id for vm_id, status in self.vm_status.items() if status.attached]
+        
+        if not attached_vms:
+            print("📭 No VMs currently attached")
+            return
+        
+        if len(attached_vms) == 1:
+            vm_id = attached_vms[0]
+        else:
+            choices = [Choice(f"{vm_id} ({self.vm_status[vm_id].name})", vm_id) 
+                      for vm_id in attached_vms]
+            choices.append(Choice("← Back to Menu", "back"))
+            
+            vm_id = questionary.select("Select VM to detach from:", choices=choices).ask()
+            
+            if not vm_id or vm_id == "back":
+                return
+        
+        try:
+            self.vm_manager.detach_interactive_session(vm_id)
+            self.vm_status[vm_id].attached = False
+            print(f"✅ Detached from VM '{vm_id}' - VM continues running")
+        except Exception as e:
+            print(f"❌ Failed to detach from VM: {e}")
+    
+    def stop_persistent_vm(self):
+        """Stop a persistent VM"""
+        if not self.vm_status:
+            print("📭 No persistent VMs running")
+            return
+        
+        choices = [Choice(f"{vm_id} ({status.name}) - {status.profile}", vm_id) 
+                  for vm_id, status in self.vm_status.items()]
+        choices.append(Choice("← Back to Menu", "back"))
+        
+        vm_id = questionary.select("Select VM to stop:", choices=choices).ask()
+        
+        if not vm_id or vm_id == "back":
+            return
+        
+        # Confirm stop
+        confirm = questionary.confirm(
+            f"Stop VM '{vm_id}' ({self.vm_status[vm_id].name})? This will terminate all running processes."
+        ).ask()
+        
+        if not confirm:
+            return
+        
+        try:
+            self.vm_manager.terminate_vm_session(vm_id)
+            del self.vm_status[vm_id]
+            print(f"✅ VM '{vm_id}' stopped and removed")
+        except Exception as e:
+            print(f"❌ Failed to stop VM: {e}")
+    
     def show_vm_detailed_status(self):
         """Show detailed status for a specific VM including curator information"""
         if not self.vm_status:
@@ -748,26 +833,42 @@ print('🌙 BioXen VM ready! Profile: {selected_profile}')
     
     # ============ PRESERVED ORIGINAL FUNCTIONALITY ============
     
-    def attach_to_vm_terminal(self):
-        """Attach to a persistent VM's terminal (preserved original functionality)"""
-        if not self.vm_status:
-            print("📭 No persistent VMs available")
-            return
-        
-        choices = [Choice(f"{vm_id} ({status.name}) - {status.profile}", vm_id) for vm_id, status in self.vm_status.items()]
-        choices.append(Choice("← Back to Menu", "back"))
-        
-        vm_id = questionary.select("Select VM to attach to:", choices=choices).ask()
-        
-        if not vm_id or vm_id == "back":
-            return
+    def create_lua_vm(self):
+        """Create a one-shot interactive Lua VM (original functionality)"""
+        print("\n🌙 One-shot Interactive Lua VM")
+        print("This creates a temporary VM that exits when you're done")
+        print("For persistent VMs, use the hypervisor commands above")
+        print("-" * 70)
         
         try:
-            print(f"\n🔗 Attaching to VM '{vm_id}' (Profile: {self.vm_status[vm_id].profile})")
-            print("💡 Press Ctrl+D or type 'exit' to detach and return to menu")
-            print("💡 The VM will continue running after detachment")
-            print("💡 BioXen packages are available for use")
-            print("-" * 70)
-            
-            # Mark as attached
-            self.vm_status[vm
+            with self.vm_manager.create_interactive_session() as session:
+                print("✅ Lua VM created successfully!")
+                print("💡 Type 'exit' or press Ctrl+D to end session")
+                print("💡 All standard Lua libraries available")
+                print("-" * 50)
+                session.interactive_loop()
+                print("👋 Lua session ended")
+        except KeyboardInterrupt:
+            print("\n⚠️ Session interrupted by user")
+        except Exception as e:
+            print(f"❌ Error in Lua session: {e}")
+
+
+def main():
+    """Main entry point"""
+    print("🌙 BioXen Enhanced Interactive Lua VM Manager")
+    print("=" * 70)
+    
+    try:
+        with EnhancedInteractiveBioXen() as bioxen:
+            bioxen.main_menu()
+    except KeyboardInterrupt:
+        print("\n\n👋 Goodbye!")
+    except Exception as e:
+        print(f"\n❌ Fatal error: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()
