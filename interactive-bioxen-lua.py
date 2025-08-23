@@ -122,54 +122,67 @@ BIOXEN_PROFILES = {
             from questionary import Choice
         except ImportError:
             print("❌ questionary not installed. Install with: pip install questionary")
-            sys.exit(1)
 
-        try:
-            # New v0.1.6 imports with curator system
-            from pylua_bioxen_vm_lib import VMManager, InteractiveSession, SessionManager
-            from pylua_bioxen_vm_lib.vm_manager import VMCluster
-            from pylua_bioxen_vm_lib.networking import NetworkedLuaVM, validate_host, validate_port
-            from pylua_bioxen_vm_lib.lua_process import LuaProcess
-            from pylua_bioxen_vm_lib.exceptions import (
-                InteractiveSessionError, AttachError, DetachError, 
-                SessionNotFoundError, SessionAlreadyExistsError, 
-                VMManagerError, ProcessRegistryError, LuaProcessError,
-                NetworkingError, LuaVMError
-            )
-            # Curator system imports
-            from pylua_bioxen_vm_lib.utils.curator import (
-                Curator, get_curator, bootstrap_lua_environment, Package
-            )
-            from pylua_bioxen_vm_lib.env import EnvironmentManager
-        except ImportError as e:
-            print(f"❌ Import error: {e}")
-            print("Make sure pylua_bioxen_vm_lib>=0.1.6 is installed:")
-            print("  pip install --upgrade pylua_bioxen_vm_lib")
-            sys.exit(1)
+            # Proper import block
+            import sys
+            import os
+            import time
+            import threading
+            import signal
+            import termios
+            import tty
+            import select
+            from pathlib import Path
+            from datetime import datetime
+            from typing import Dict, List, Optional, Any
+            from dataclasses import dataclass
 
-        try:
-            from rich.console import Console
-            from rich.table import Table
-            from rich.live import Live
-            from rich.panel import Panel
-            from rich.text import Text
-            from rich.progress import Progress, SpinnerColumn, TextColumn
-            RICH_AVAILABLE = True
-        except ImportError:
-            RICH_AVAILABLE = False
-            print("⚠️ 'rich' library not available. Install with: pip install rich for enhanced display")
+            # Add src to path for imports
+            sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-        # ...existing code...
-        self.original_attrs = None
-        self.raw_mode = False
-    
-    def enter_raw_mode(self):
-        """Enter raw terminal mode for direct VM interaction"""
-        if not sys.stdin.isatty():
-            return False
-        
-        try:
-            self.original_attrs = termios.tcgetattr(sys.stdin.fileno())
+            try:
+                import questionary
+                from questionary import Choice
+            except ImportError:
+                print("❌ questionary not installed. Install with: pip install questionary")
+                sys.exit(1)
+
+            try:
+                # New v0.1.6 imports with curator system
+                from pylua_bioxen_vm_lib import VMManager, InteractiveSession, SessionManager
+                from pylua_bioxen_vm_lib.vm_manager import VMCluster
+                from pylua_bioxen_vm_lib.networking import NetworkedLuaVM, validate_host, validate_port
+                from pylua_bioxen_vm_lib.lua_process import LuaProcess
+                from pylua_bioxen_vm_lib.exceptions import (
+                    InteractiveSessionError, AttachError, DetachError, 
+                    SessionNotFoundError, SessionAlreadyExistsError, 
+                    VMManagerError, ProcessRegistryError, LuaProcessError,
+                    NetworkingError, LuaVMError
+                )
+                # Curator system imports
+                from pylua_bioxen_vm_lib.utils.curator import (
+                    Curator, get_curator, bootstrap_lua_environment, Package
+                )
+                from pylua_bioxen_vm_lib.env import EnvironmentManager
+            except ImportError as e:
+                print(f"❌ Import error: {e}")
+                print("Make sure pylua_bioxen_vm_lib>=0.1.6 is installed:")
+                print("  pip install --upgrade pylua_bioxen_vm_lib")
+                sys.exit(1)
+
+            try:
+                from rich.console import Console
+                from rich.table import Table
+                from rich.live import Live
+                from rich.panel import Panel
+                from rich.text import Text
+                from rich.progress import Progress, SpinnerColumn, TextColumn
+                RICH_AVAILABLE = True
+            except ImportError:
+                RICH_AVAILABLE = False
+                print("⚠️ 'rich' library not available. Install with: pip install rich for enhanced display")
+
+            # ...existing code...
             def main_menu(self):
                 """Enhanced main menu with hypervisor and package management commands"""
                 try:
