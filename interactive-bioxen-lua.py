@@ -76,54 +76,67 @@ BIOXEN_PROFILES = {
         "packages": ["lua-cjson", "luafilesystem", "bio-utils"],
         "description": "Minimal BioXen environment with core biological tools"
     },
-    "bioxen-standard": {
-        "packages": ["lua-cjson", "luafilesystem", "penlight", "inspect", 
-                    "bio-utils", "sequence-parser"],
-        "description": "Standard BioXen environment for general bioinformatics work"
-    },
-    "bioxen-research": {
-        "packages": ["lua-cjson", "luafilesystem", "penlight", "inspect",
-                    "bio-utils", "sequence-parser", "phylo-tree", "blast-parser", 
-                    "busted", "luassert"],
-        "description": "Full research environment with testing and advanced analysis tools"
-    },
-    "bioxen-genomics": {
-        "packages": ["lua-cjson", "luafilesystem", "penlight", "bio-utils", 
-                    "sequence-parser", "genome-tools", "blast-parser"],
-        "description": "Specialized genomics analysis environment"
-    },
-    "bioxen-proteomics": {
-        "packages": ["lua-cjson", "luafilesystem", "penlight", "bio-utils",
-                    "sequence-parser", "protein-fold", "blast-parser"],
-        "description": "Specialized proteomics and structural biology environment"
-    }
-}
 
+    # Proper import block
+    import sys
+    import os
+    import time
+    import threading
+    import signal
+    import termios
+    import tty
+    import select
+    from pathlib import Path
+    from datetime import datetime
+    from typing import Dict, List, Optional, Any
+    from dataclasses import dataclass
 
-@dataclass
-class VMStatus:
-    """Enhanced VM status tracking with curator information"""
-    vm_id: str
-    name: str
-    created_at: datetime
-    attached: bool = False
-    profile: str = "standard"
-    packages_installed: int = 0
-    curator_health: Dict[str, Any] = None
-    
-    def __post_init__(self):
-        if self.curator_health is None:
-            self.curator_health = {}
-    
-    def update_activity(self):
-        self.last_activity = datetime.now()
-    
-    def get_uptime(self) -> str:
-        uptime = datetime.now() - self.created_at
-        hours, remainder = divmod(int(uptime.total_seconds()), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        if hours > 0:
-            return f"{hours}h {minutes}m {seconds}s"
+    # Add src to path for imports
+    sys.path.insert(0, str(Path(__file__).parent / 'src'))
+
+    try:
+        import questionary
+        from questionary import Choice
+    except ImportError:
+        print("❌ questionary not installed. Install with: pip install questionary")
+        sys.exit(1)
+
+    try:
+        # New v0.1.6 imports with curator system
+        from pylua_bioxen_vm_lib import VMManager, InteractiveSession, SessionManager
+        from pylua_bioxen_vm_lib.vm_manager import VMCluster
+        from pylua_bioxen_vm_lib.networking import NetworkedLuaVM, validate_host, validate_port
+        from pylua_bioxen_vm_lib.lua_process import LuaProcess
+        from pylua_bioxen_vm_lib.exceptions import (
+            InteractiveSessionError, AttachError, DetachError, 
+            SessionNotFoundError, SessionAlreadyExistsError, 
+            VMManagerError, ProcessRegistryError, LuaProcessError,
+            NetworkingError, LuaVMError
+        )
+        # Curator system imports
+        from pylua_bioxen_vm_lib.utils.curator import (
+            Curator, get_curator, bootstrap_lua_environment, Package
+        )
+        from pylua_bioxen_vm_lib.env import EnvironmentManager
+    except ImportError as e:
+        print(f"❌ Import error: {e}")
+        print("Make sure pylua_bioxen_vm_lib>=0.1.6 is installed:")
+        print("  pip install --upgrade pylua_bioxen_vm_lib")
+        sys.exit(1)
+
+    try:
+        from rich.console import Console
+        from rich.table import Table
+        from rich.live import Live
+        from rich.panel import Panel
+        from rich.text import Text
+        from rich.progress import Progress, SpinnerColumn, TextColumn
+        RICH_AVAILABLE = True
+    except ImportError:
+        RICH_AVAILABLE = False
+        print("⚠️ 'rich' library not available. Install with: pip install rich for enhanced display")
+
+    # ...existing code...
         elif minutes > 0:
             return f"{minutes}m {seconds}s"
         else:
