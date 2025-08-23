@@ -26,6 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from .lua_process import LuaProcess
 from .networking import NetworkedLuaVM
 from .interactive_session import InteractiveSession, SessionManager
+from .logger import VMLogger
 from .exceptions import (
     VMManagerError, 
     ProcessRegistryError,
@@ -44,16 +45,19 @@ class VMManager:
     terminal capabilities similar to a hypervisor.
     """
     
-    def __init__(self, max_workers: int = 10, lua_executable: str = "lua"):
+    def __init__(self, max_workers: int = 10, lua_executable: str = "lua", debug_mode: bool = False):
         """
         Initialize the VM manager.
         
         Args:
             max_workers: Maximum number of concurrent VM executions
             lua_executable: Path to Lua interpreter
+            debug_mode: Enable debug logging
         """
         self.max_workers = max_workers
         self.lua_executable = lua_executable
+        self.debug_mode = debug_mode
+        self.logger = VMLogger(debug_mode=debug_mode, component="VMManager")
         
         # VM and execution tracking
         self.vms: Dict[str, LuaProcess] = {}
@@ -61,13 +65,15 @@ class VMManager:
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         
         # Interactive session management
-        self.session_manager = SessionManager()
+        self.session_manager = SessionManager(debug_mode=debug_mode)
         
         # Thread safety
         self._lock = threading.RLock()
         
         # Process registry for persistent VMs
         self._persistent_vms: Dict[str, Dict[str, Any]] = {}
+        
+        self.logger.debug(f"VMManager initialized with max_workers={max_workers}, debug_mode={debug_mode}")
 
     # ==================== CORE VM MANAGEMENT ====================
     def create_vm(self, vm_id: str, networked: bool = False, persistent: bool = False) -> LuaProcess:
@@ -85,20 +91,24 @@ class VMManager:
             raise ValueError(f"VM with ID '{vm_id}' already exists")
         with self._lock:
             if networked:
-                vm = NetworkedLuaVM(name=vm_id, lua_executable=self.lua_executable)
+                vm = NetworkedLuaVM(name=vm_id, lua_executable=self.lua_executable, debug_mode=self.debug_mode)
             else:
-                vm = LuaProcess(name=vm_id, lua_executable=self.lua_executable)
+                vm = LuaProcess(name=vm_id, lua_executable=self.lua_executable, debug_mode=self.debug_mode)
             self.vms[vm_id] = vm
             # Register for interactive sessions if persistent
             if persistent:
                 self._register_persistent_vm(vm_id, networked)
+            self.logger.debug(f"Created VM '{vm_id}' (networked={networked}, persistent={persistent})")
             return vm
+
     def get_vm(self, vm_id: str) -> Optional[LuaProcess]:
         """Get a VM by ID."""
         return self.vms.get(vm_id)
+
     def list_vms(self) -> List[str]:
         """Get list of all VM IDs."""
         return list(self.vms.keys())
+
     def remove_vm(self, vm_id: str) -> bool:
         """
         Remove a VM and clean up its resources.
@@ -121,8 +131,10 @@ class VMManager:
                 future = self.futures.pop(vm_id, None)
                 if future and not future.done():
                     future.cancel()
+                self.logger.debug(f"Removed VM '{vm_id}' and cleaned up resources")
                 return True
             return False
+
     # ==================== PERSISTENT VM REGISTRY ====================
     def _register_persistent_vm(self, vm_id: str, networked: bool) -> None:
         """Register a VM in the persistent registry."""
@@ -132,6 +144,8 @@ class VMManager:
             'interactive_capable': True,
             'session_active': False
         }
+        self.logger.debug(f"Registered persistent VM '{vm_id}' (networked={networked})")
+
     def list_persistent_vms(self) -> Dict[str, Dict[str, Any]]:
         """
         Get information about all persistent VMs.
@@ -147,6 +161,7 @@ class VMManager:
                     'vm_exists': vm_id in self.vms
                 }
             return result
+
     def get_vm_info(self, vm_id: str) -> Optional[Dict[str, Any]]:
         """
         Get detailed information about a specific VM.
@@ -167,6 +182,7 @@ class VMManager:
             'interactive_capable': vm_id in self._persistent_vms,
             **persistent_info
         }
+
     # ==================== INTERACTIVE SESSION MANAGEMENT ====================
     def attach_to_vm(self, vm_id: str, output_callback: Optional[Callable[[str], None]] = None) -> InteractiveSession:
         """
@@ -185,7 +201,9 @@ class VMManager:
             # Update persistent registry
             if vm_id in self._persistent_vms:
                 self._persistent_vms[vm_id]['session_active'] = True
+            self.logger.debug(f"Attached to VM '{vm_id}' interactive session")
             return session
+
     def detach_from_vm(self, vm_id: str) -> None:
         """
         Detach from a VM's interactive session (keeps VM running).
@@ -196,6 +214,8 @@ class VMManager:
             # Update persistent registry
             if vm_id in self._persistent_vms:
                 self._persistent_vms[vm_id]['session_active'] = False
+            self.logger.debug(f"Detached from VM '{vm_id}' interactive session")
+
     def send_input(self, vm_id: str, input_str: str) -> None:
         """
         Send input to a VM's interactive session.
@@ -204,6 +224,8 @@ class VMManager:
         if not session:
             raise SessionNotFoundError(f"No interactive session for VM '{vm_id}'")
         session.send_command(input_str)
+        self.logger.debug(f"Sent input to VM '{vm_id}': {input_str!r}")
+
     def read_output(self, vm_id: str, timeout: Optional[float] = 0.1) -> str:
         """
         Read output from a VM's interactive session.
@@ -211,7 +233,10 @@ class VMManager:
         session = self.session_manager.get_session(vm_id)
         if not session:
             raise SessionNotFoundError(f"No interactive session for VM '{vm_id}'")
-        return session.read_output(timeout=timeout)
+        output = session.read_output(timeout=timeout)
+        self.logger.debug(f"Read output from VM '{vm_id}': {output!r}")
+        return output
+
     def execute_interactive_command(self, vm_id: str, command: str, timeout: float = 5.0) -> str:
         """
         Execute a command in an interactive session and wait for output.
@@ -219,12 +244,16 @@ class VMManager:
         session = self.session_manager.get_session(vm_id)
         if not session:
             raise SessionNotFoundError(f"No interactive session for VM '{vm_id}'")
-        return session.execute_and_wait(command, timeout=timeout)
+        result = session.execute_and_wait(command, timeout=timeout)
+        self.logger.debug(f"Executed interactive command on VM '{vm_id}': {command!r} -> {result!r}")
+        return result
+
     def list_interactive_sessions(self) -> Dict[str, Dict[str, Any]]:
         """
         List all active interactive sessions.
         """
         return self.session_manager.list_sessions()
+
     def terminate_vm_session(self, vm_id: str) -> None:
         """
         Terminate a VM's interactive session and stop the process.
@@ -236,6 +265,8 @@ class VMManager:
             # Update persistent registry
             if vm_id in self._persistent_vms:
                 self._persistent_vms[vm_id]['session_active'] = False
+            self.logger.debug(f"Terminated VM '{vm_id}' session")
+
     # ==================== HYPERVISOR-LIKE OPERATIONS ====================
     def create_interactive_vm(self, vm_id: str, networked: bool = False, auto_attach: bool = True) -> InteractiveSession:
         """
@@ -247,7 +278,10 @@ class VMManager:
             return self.attach_to_vm(vm_id)
         else:
             # Create session but don't attach
-            return self.session_manager.create_session(vm_id, vm)
+            session = self.session_manager.create_session(vm_id, vm)
+            self.logger.debug(f"Created interactive VM '{vm_id}' (auto_attach={auto_attach})")
+            return session
+
     def clone_vm_session(self, source_vm_id: str, target_vm_id: str) -> InteractiveSession:
         """
         Clone a VM's configuration to create a new interactive session.
@@ -257,7 +291,10 @@ class VMManager:
             raise SessionNotFoundError(f"Source VM '{source_vm_id}' not found")
         # Determine if source is networked
         networked = isinstance(source_vm, NetworkedLuaVM)
-        return self.create_interactive_vm(target_vm_id, networked=networked, auto_attach=True)
+        session = self.create_interactive_vm(target_vm_id, networked=networked, auto_attach=True)
+        self.logger.debug(f"Cloned VM session from '{source_vm_id}' to '{target_vm_id}'")
+        return session
+
     def bulk_create_interactive_cluster(self, cluster_id: str, vm_count: int, 
                                       networked: bool = True) -> Dict[str, InteractiveSession]:
         """
@@ -268,7 +305,9 @@ class VMManager:
             vm_id = f"{cluster_id}_{i:03d}"
             session = self.create_interactive_vm(vm_id, networked=networked, auto_attach=False)
             sessions[vm_id] = session
+        self.logger.debug(f"Created interactive cluster '{cluster_id}' with {vm_count} VMs")
         return sessions
+
     def broadcast_to_interactive_sessions(self, vm_pattern: str, command: str) -> Dict[str, str]:
         """
         Broadcast a command to all interactive sessions matching a pattern.
@@ -289,7 +328,9 @@ class VMManager:
                 results[vm_id] = output
             except Exception as e:
                 results[vm_id] = f"Error: {e}"
+        self.logger.debug(f"Broadcast command to {len(matching_sessions)} sessions matching '{vm_pattern}'")
         return results
+
     # ==================== BACKWARD COMPATIBLE METHODS ====================
     def execute_vm_async(self, vm_id: str, lua_code: str, 
                         timeout: Optional[float] = None) -> Future:
@@ -303,7 +344,9 @@ class VMManager:
             return vm.execute_string(lua_code, timeout=timeout)
         future = self.executor.submit(execute)
         self.futures[vm_id] = future
+        self.logger.debug(f"Started async execution on VM '{vm_id}'")
         return future
+
     def execute_vm_sync(self, vm_id: str, lua_code: str, 
                        timeout: Optional[float] = None) -> Dict[str, Any]:
         """
@@ -312,7 +355,10 @@ class VMManager:
         vm = self.get_vm(vm_id)
         if not vm:
             raise ValueError(f"VM '{vm_id}' not found")
-        return vm.execute_string(lua_code, timeout=timeout)
+        result = vm.execute_string(lua_code, timeout=timeout)
+        self.logger.debug(f"Executed sync code on VM '{vm_id}', success={result.get('success', False)}")
+        return result
+
     def start_server_vm(self, vm_id: str, port: int, 
                        timeout: Optional[float] = None) -> Future:
         """Start a VM as a socket server asynchronously."""
@@ -323,7 +369,9 @@ class VMManager:
             return vm.start_server(port, timeout=timeout)
         future = self.executor.submit(start_server)
         self.futures[vm_id] = future
+        self.logger.debug(f"Started server VM '{vm_id}' on port {port}")
         return future
+
     def start_client_vm(self, vm_id: str, host: str, port: int, 
                        message: str = "Hello from client!", 
                        timeout: Optional[float] = None) -> Future:
@@ -335,7 +383,9 @@ class VMManager:
             return vm.start_client(host, port, message, timeout=timeout)
         future = self.executor.submit(start_client)
         self.futures[vm_id] = future
+        self.logger.debug(f"Started client VM '{vm_id}' connecting to {host}:{port}")
         return future
+
     def start_p2p_vm(self, vm_id: str, local_port: int,
                      peer_host: Optional[str] = None, peer_port: Optional[int] = None,
                      run_duration: int = 30, timeout: Optional[float] = None) -> Future:
@@ -347,20 +397,29 @@ class VMManager:
             return vm.start_p2p(local_port, peer_host, peer_port, run_duration, timeout=timeout)
         future = self.executor.submit(start_p2p)
         self.futures[vm_id] = future
+        self.logger.debug(f"Started P2P VM '{vm_id}' on port {local_port}")
         return future
+
     # ==================== UTILITY AND MANAGEMENT METHODS ====================
     def wait_for_vm(self, vm_id: str, timeout: Optional[float] = None) -> Dict[str, Any]:
         """Wait for an asynchronous VM operation to complete."""
         future = self.futures.get(vm_id)
         if not future:
             raise ValueError(f"No running operation found for VM '{vm_id}'")
-        return future.result(timeout=timeout)
+        result = future.result(timeout=timeout)
+        self.logger.debug(f"VM '{vm_id}' operation completed")
+        return result
+
     def cancel_vm(self, vm_id: str) -> bool:
         """Cancel a running VM operation."""
         future = self.futures.get(vm_id)
         if future and not future.done():
-            return future.cancel()
+            cancelled = future.cancel()
+            if cancelled:
+                self.logger.debug(f"Cancelled VM '{vm_id}' operation")
+            return cancelled
         return False
+
     def get_vm_status(self, vm_id: str) -> Optional[str]:
         """Get the status of a VM's current operation."""
         future = self.futures.get(vm_id)
@@ -372,6 +431,7 @@ class VMManager:
             return 'done'
         else:
             return 'running'
+
     def create_vm_cluster(self, cluster_id: str, vm_count: int, 
                          networked: bool = True) -> List[str]:
         """Create a cluster of VMs with consistent naming."""
@@ -380,7 +440,9 @@ class VMManager:
             vm_id = f"{cluster_id}_{i:03d}"
             self.create_vm(vm_id, networked=networked)
             vm_ids.append(vm_id)
+        self.logger.debug(f"Created VM cluster '{cluster_id}' with {vm_count} VMs")
         return vm_ids
+
     def setup_p2p_cluster(self, cluster_id: str, vm_count: int, 
                          base_port: int = 8080, run_duration: int = 60) -> List[Future]:
         """Set up a P2P cluster where each VM connects to the next one in a ring."""
@@ -408,7 +470,9 @@ class VMManager:
                 run_duration=run_duration
             )
             futures.append(future)
+        self.logger.debug(f"Set up P2P cluster '{cluster_id}' with {vm_count} VMs in ring topology")
         return futures
+
     def broadcast_to_cluster(self, cluster_pattern: str, lua_code: str,
                            timeout: Optional[float] = None) -> Dict[str, Future]:
         """Broadcast Lua code execution to all VMs matching a pattern."""
@@ -420,7 +484,9 @@ class VMManager:
         for vm_id in matching_vms:
             future = self.execute_vm_async(vm_id, lua_code, timeout=timeout)
             futures[vm_id] = future
+        self.logger.debug(f"Broadcast to {len(matching_vms)} VMs matching '{cluster_pattern}'")
         return futures
+
     def wait_for_cluster(self, futures: Dict[str, Future], 
                         timeout: Optional[float] = None) -> Dict[str, Dict[str, Any]]:
         """Wait for multiple VM operations to complete."""
@@ -436,7 +502,9 @@ class VMManager:
                     'stderr': str(e),
                     'return_code': -1
                 }
+        self.logger.debug(f"Completed cluster operation for {len(futures)} VMs")
         return results
+
     def get_cluster_status(self, cluster_pattern: str) -> Dict[str, str]:
         """Get status of all VMs matching a pattern."""
         status = {}
@@ -444,6 +512,7 @@ class VMManager:
             if fnmatch.fnmatch(vm_id, cluster_pattern):
                 status[vm_id] = self.get_vm_status(vm_id) or 'idle'
         return status
+
     def cleanup_cluster(self, cluster_pattern: str) -> int:
         """Remove all VMs matching a pattern."""
         matching_vms = [vm_id for vm_id in self.vms.keys() 
@@ -452,16 +521,21 @@ class VMManager:
         for vm_id in matching_vms:
             if self.remove_vm(vm_id):
                 removed_count += 1
+        self.logger.debug(f"Cleaned up cluster '{cluster_pattern}': removed {removed_count} VMs")
         return removed_count
+
     def shutdown_all(self) -> None:
         """Shutdown all VMs and clean up resources."""
         # Cancel all running futures
+        cancelled_count = 0
         for future in self.futures.values():
             if not future.done():
-                future.cancel()
+                if future.cancel():
+                    cancelled_count += 1
         # Clean up all interactive sessions
         self.session_manager.cleanup_all()
         # Clean up all VMs
+        vm_count = len(self.vms)
         for vm in self.vms.values():
             vm.cleanup()
         # Clear collections
@@ -470,6 +544,8 @@ class VMManager:
         self._persistent_vms.clear()
         # Shutdown executor
         self.executor.shutdown(wait=True)
+        self.logger.debug(f"Shutdown complete: cleaned up {vm_count} VMs, cancelled {cancelled_count} futures")
+
     def get_stats(self) -> Dict[str, Any]:
         """Get statistics about the VM manager state."""
         running_count = sum(1 for status in [self.get_vm_status(vm_id) for vm_id in self.vms.keys()]
@@ -490,16 +566,20 @@ class VMManager:
             'max_workers': self.max_workers,
             'lua_executable': self.lua_executable
         }
+
     def __enter__(self):
         """Context manager entry."""
         return self
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit with cleanup."""
         self.shutdown_all()
+
     def __repr__(self):
         return (f"VMManager(vms={len(self.vms)}, "
                 f"interactive_sessions={len(self.session_manager.list_sessions())}, "
                 f"max_workers={self.max_workers})")
+
 
 # Keep the existing VMCluster class for backward compatibility
 class VMCluster:
@@ -512,6 +592,7 @@ class VMCluster:
         self.manager = manager
         self.cluster_id = cluster_id
         self.vm_ids = vm_ids
+
     def broadcast(self, lua_code: str, timeout: Optional[float] = None) -> Dict[str, Future]:
         """Broadcast code execution to all VMs in cluster."""
         futures = {}
@@ -519,14 +600,17 @@ class VMCluster:
             future = self.manager.execute_vm_async(vm_id, lua_code, timeout=timeout)
             futures[vm_id] = future
         return futures
+
     def wait_all(self, futures: Dict[str, Future], 
                 timeout: Optional[float] = None) -> Dict[str, Dict[str, Any]]:
         """Wait for all cluster operations to complete."""
         return self.manager.wait_for_cluster(futures, timeout=timeout)
+
     def get_status(self) -> Dict[str, str]:
         """Get status of all VMs in cluster."""
         return {vm_id: self.manager.get_vm_status(vm_id) or 'idle' 
                 for vm_id in self.vm_ids}
+
     def cleanup(self) -> int:
         """Remove all VMs in this cluster."""
         removed = 0
@@ -534,32 +618,9 @@ class VMCluster:
             if self.manager.remove_vm(vm_id):
                 removed += 1
         return removed
+
     def __len__(self):
         return len(self.vm_ids)
-    def __repr__(self):
-        return f"VMCluster(id='{self.cluster_id}', vms={len(self.vm_ids)})"
-        return futures
-    
-    def wait_all(self, futures: Dict[str, Future], 
-                timeout: Optional[float] = None) -> Dict[str, Dict[str, Any]]:
-        """Wait for all cluster operations to complete."""
-        return self.manager.wait_for_cluster(futures, timeout=timeout)
-    
-    def get_status(self) -> Dict[str, str]:
-        """Get status of all VMs in cluster."""
-        return {vm_id: self.manager.get_vm_status(vm_id) or 'idle' 
-                for vm_id in self.vm_ids}
-    
-    def cleanup(self) -> int:
-        """Remove all VMs in this cluster."""
-        removed = 0
-        for vm_id in self.vm_ids:
-            if self.manager.remove_vm(vm_id):
-                removed += 1
-        return removed
-    
-    def __len__(self):
-        return len(self.vm_ids)
-    
+
     def __repr__(self):
         return f"VMCluster(id='{self.cluster_id}', vms={len(self.vm_ids)})"

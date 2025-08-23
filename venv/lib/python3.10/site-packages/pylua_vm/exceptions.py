@@ -1,5 +1,5 @@
 """
-Custom exceptions for pylua-bioxen-vm library.
+Custom exceptions for pylua_bioxen_vm_lib library.
 """
 
 class LuaVMError(Exception):
@@ -229,4 +229,4 @@ except Exception as e:
 
 print("\n" + "=" * 50)
 print("Installation test complete!")
-print("All features tested for pylua-bioxen-vm interactive support")
+print("All features tested for pylua_bioxen_vm_lib interactive support")
