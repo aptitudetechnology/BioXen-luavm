@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "created": "2025-08-24T23:30:57.809289",
+  "lua_version": "5.1.5",
+  "packages": {},
+  "profiles": {
+    "minimal": [
+      "lua-cjson",
+      "luafilesystem"
+    ],
+    "standard": [
+      "lua-cjson",
+      "luafilesystem",
+      "penlight",
+      "inspect"
+    ],
+    "full": [
+      "lua-cjson",
+      "luafilesystem",
+      "penlight",
+      "inspect",
+      "luasocket",
+      "http",
+      "lpeg",
+      "lua-parser",
+      "busted",
+      "luassert"
+    ]
+  },
+  "last_updated": "2025-08-24T23:30:57.811974"
+}
