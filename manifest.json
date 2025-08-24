@@ -25,7 +25,29 @@
       "lua-parser",
       "busted",
       "luassert"
+    ],
+    "bioxen-minimal": [
+      "lua-cjson",
+      "luafilesystem",
+      "bio-utils"
+    ],
+    "bioxen-standard": [
+      "lua-cjson",
+      "luafilesystem",
+      "bio-utils",
+      "sequence-parser",
+      "phylo-tree"
+    ],
+    "bioxen-full": [
+      "lua-cjson",
+      "luafilesystem",
+      "bio-utils",
+      "sequence-parser",
+      "phylo-tree",
+      "blast-parser",
+      "genome-tools",
+      "protein-fold"
     ]
   },
-  "last_updated": "2025-08-24T23:30:57.811974"
+  "last_updated": "2025-08-25T02:19:31.540732"
 }

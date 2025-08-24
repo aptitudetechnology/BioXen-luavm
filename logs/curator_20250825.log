@@ -1,0 +1,94 @@
+2025-08-25 00:18:28,117 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-25 00:18:28,117 - curator - INFO - Loaded manifest: 0 packages
+2025-08-25 00:19:17,194 - curator - INFO - Curating environment with profile 'bioxen-minimal': 3 packages
+2025-08-25 00:19:17,357 - curator - INFO - Installing lua-cjson vlatest...
+2025-08-25 00:19:17,440 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:19:17,598 - curator - INFO - Installing luafilesystem vlatest...
+2025-08-25 00:19:17,681 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:19:17,836 - curator - INFO - Installing bio-utils vlatest...
+2025-08-25 00:19:17,918 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:19:17,918 - curator - INFO - Environment curation complete: 0/3 packages installed
+2025-08-25 00:20:04,099 - curator - INFO - Curating environment with profile 'bioxen-minimal': 3 packages
+2025-08-25 00:20:04,296 - curator - INFO - Installing lua-cjson vlatest...
+2025-08-25 00:20:04,382 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:20:04,539 - curator - INFO - Installing luafilesystem vlatest...
+2025-08-25 00:20:04,627 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:20:04,784 - curator - INFO - Installing bio-utils vlatest...
+2025-08-25 00:20:04,868 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:20:04,869 - curator - INFO - Environment curation complete: 0/3 packages installed
+2025-08-25 00:21:12,281 - curator - INFO - Curating environment with profile 'standard': 4 packages
+2025-08-25 00:21:12,481 - curator - INFO - Installing lua-cjson vlatest...
+2025-08-25 00:21:12,569 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:21:12,729 - curator - INFO - Installing luafilesystem vlatest...
+2025-08-25 00:21:12,811 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:21:12,967 - curator - INFO - Installing penlight vlatest...
+2025-08-25 00:21:13,049 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:21:13,207 - curator - INFO - Installing inspect vlatest...
+2025-08-25 00:21:13,289 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 00:21:13,289 - curator - INFO - Environment curation complete: 0/4 packages installed
+2025-08-25 02:19:31,422 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-25 02:19:31,422 - curator - INFO - Loaded manifest: 0 packages
+2025-08-25 02:20:17,419 - curator - INFO - Curating environment with profile 'bioxen-minimal': 3 packages
+2025-08-25 02:20:17,583 - curator - INFO - Installing lua-cjson vlatest...
+2025-08-25 02:20:17,666 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 02:20:17,823 - curator - INFO - Installing luafilesystem vlatest...
+2025-08-25 02:20:17,907 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 02:20:18,062 - curator - INFO - Installing bio-utils vlatest...
+2025-08-25 02:20:18,146 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 02:20:18,146 - curator - INFO - Environment curation complete: 0/3 packages installed
+2025-08-25 02:22:18,090 - curator - INFO - Installing uncatalogued package: gaby-lua
+2025-08-25 02:22:18,179 - curator - INFO - Installing gaby-lua vlatest...
+2025-08-25 02:22:18,263 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 02:22:36,681 - curator - INFO - Installing uncatalogued package: gabby-lua
+2025-08-25 02:22:36,801 - curator - INFO - Installing gabby-lua vlatest...
+2025-08-25 02:22:36,894 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 02:24:25,379 - curator - INFO - Installing sequence-parser vlatest...
+2025-08-25 02:24:25,467 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
