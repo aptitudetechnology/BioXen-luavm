@@ -223,3 +223,22 @@ Error: Your user does not have write permissions in /usr/local/lib/luarocks/rock
 
 2025-08-25 13:56:04,124 - curator - INFO - Detected Lua at: /usr/bin/lua
 2025-08-25 13:56:04,125 - curator - INFO - Loaded manifest: 1 packages
+2025-08-25 14:21:12,755 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-25 14:21:12,755 - curator - INFO - Loaded manifest: 1 packages
+2025-08-25 14:21:27,414 - curator - INFO - Curating environment with profile 'bioxen-minimal': 3 packages
+2025-08-25 14:21:27,630 - curator - INFO - Installing lua-cjson vlatest...
+2025-08-25 14:21:27,715 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 14:21:27,869 - curator - INFO - Installing luafilesystem vlatest...
+2025-08-25 14:21:27,955 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 14:21:28,121 - curator - INFO - Installing bio-utils vlatest...
+2025-08-25 14:21:28,207 - curator - ERROR - Installation failed: 
+Error: Your user does not have write permissions in /usr/local/lib/luarocks/rocks-5.1 
+-- you may want to run as a privileged user or use your local tree with --local.
+
+2025-08-25 14:21:28,207 - curator - INFO - Environment curation complete: 0/3 packages installed

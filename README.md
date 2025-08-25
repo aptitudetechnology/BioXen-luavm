@@ -18,8 +18,14 @@ BioXen Lua VM Manager is an advanced interactive CLI tool for launching, managin
 - A working Lua installation (with LuaRocks recommended)
 
 ## Installation
+Install all dependencies using:
 ```bash
-pip install --upgrade pylua_bioxen_vm_lib questionary rich
+pip install -r requirements.txt
+```
+
+If you want enhanced CLI output, also install rich:
+```bash
+pip install rich
 ```
 
 ## Usage
