@@ -2,7 +2,19 @@
   "version": "1.0",
   "created": "2025-08-24T23:30:57.809289",
   "lua_version": "5.1.5",
-  "packages": {},
+  "packages": {
+    "luasocket": {
+      "name": "luasocket",
+      "version": "latest",
+      "category": "network",
+      "description": "Network support for Lua",
+      "dependencies": [],
+      "installed": false,
+      "install_date": null,
+      "source": "luarocks",
+      "priority": 8
+    }
+  },
   "profiles": {
     "minimal": [
       "lua-cjson",
@@ -34,20 +46,43 @@
     "bioxen-standard": [
       "lua-cjson",
       "luafilesystem",
+      "luasocket",
       "bio-utils",
       "sequence-parser",
-      "phylo-tree"
+      "phylo-tree",
+      "gabby-lua"
     ],
     "bioxen-full": [
       "lua-cjson",
       "luafilesystem",
+      "luasocket",
       "bio-utils",
       "sequence-parser",
       "phylo-tree",
       "blast-parser",
       "genome-tools",
-      "protein-fold"
+      "protein-fold",
+      "gabby-lua",
+      "lua-radio",
+      "penlight"
+    ],
+    "bioxen-ai": [
+      "lua-cjson",
+      "luafilesystem",
+      "luasocket",
+      "gabby-lua",
+      "bio-utils",
+      "sequence-parser",
+      "penlight"
+    ],
+    "bioxen-radio": [
+      "lua-cjson",
+      "luafilesystem",
+      "luasocket",
+      "lua-radio",
+      "lua-messagepack",
+      "penlight"
     ]
   },
-  "last_updated": "2025-08-25T02:19:31.540732"
+  "last_updated": "2025-08-25T13:56:04.204897"
 }
