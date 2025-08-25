@@ -52,10 +52,6 @@ except ImportError as e:
     print("  pip install --upgrade pylua_bioxen_vm_lib")
     sys.exit(1)
 
-# External package dictionary imports
-from pkgdict.bioxen_packages import ALL_PACKAGES, BIOXEN_PACKAGES
-from pkgdict.bioxen_profiles import ALL_PROFILES, BIOXEN_PROFILES, PROFILE_CATEGORIES
-
 try:
     from rich.console import Console
     from rich.table import Table
@@ -67,6 +63,40 @@ try:
 except ImportError:
     RICH_AVAILABLE = False
     print("⚠️ 'rich' library not available. Install with: pip install rich for enhanced display")
+
+
+# BioXen-specific package collections
+BIOXEN_PACKAGES = {
+    "bio-utils": Package("bio-utils", category="biology", priority=9,
+                        description="Essential biological data processing utilities"),
+    "sequence-parser": Package("sequence-parser", category="biology", priority=8,
+                              description="DNA/RNA/protein sequence parsing and analysis"),
+    "phylo-tree": Package("phylo-tree", category="biology", priority=7,
+                         description="Phylogenetic tree construction and analysis"),
+    "blast-parser": Package("blast-parser", category="biology", priority=6,
+                           description="BLAST output parsing and analysis"),
+    "genome-tools": Package("genome-tools", category="biology", priority=7,
+                           description="Genome assembly and annotation tools"),
+    "protein-fold": Package("protein-fold", category="biology", priority=5,
+                           description="Protein structure prediction utilities"),
+}
+
+# BioXen environment profiles
+BIOXEN_PROFILES = {
+    "bioxen-minimal": {
+        "packages": ["lua-cjson", "luafilesystem", "bio-utils"],
+        "description": "Minimal BioXen environment with core biological tools"
+    },
+    "bioxen-standard": {
+        "packages": ["lua-cjson", "luafilesystem", "bio-utils", "sequence-parser", "phylo-tree"],
+        "description": "Standard BioXen environment with common biological analysis tools"
+    },
+    "bioxen-full": {
+        "packages": ["lua-cjson", "luafilesystem", "bio-utils", "sequence-parser", "phylo-tree", 
+                    "blast-parser", "genome-tools", "protein-fold"],
+        "description": "Full BioXen environment with all available biological tools"
+    }
+}
 
 
 @dataclass
