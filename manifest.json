@@ -101,6 +101,17 @@
       "install_date": null,
       "source": "luarocks",
       "priority": 5
+    },
+    "luarocks": {
+      "name": "luarocks",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": true,
+      "install_date": "2025-08-26 21:13:12.688738",
+      "source": "luarocks",
+      "priority": 5
     }
   },
   "profiles": {
@@ -172,5 +183,5 @@
       "penlight"
     ]
   },
-  "last_updated": "2025-08-26T16:02:34.285984"
+  "last_updated": "2025-08-26T21:26:27.583418"
 }

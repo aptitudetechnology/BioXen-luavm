@@ -88,3 +88,34 @@ Example: luarocks install cqueues CRYPTO_DIR=/usr/local
 2025-08-26 16:02:34,169 - curator - INFO - Installing uncatalogued package: luassert
 2025-08-26 16:02:34,285 - curator - INFO - Package luassert already installed
 2025-08-26 16:02:34,286 - curator - INFO - Environment curation complete: 9/10 packages installed
+2025-08-26 21:12:25,309 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-26 21:12:25,310 - curator - INFO - Loaded manifest: 9 packages
+2025-08-26 21:12:56,463 - curator - INFO - Installing uncatalogued package: luarocks
+2025-08-26 21:12:56,573 - curator - INFO - Installing luarocks vlatest...
+2025-08-26 21:13:12,688 - curator - INFO - Successfully installed luarocks
+2025-08-26 21:13:35,031 - curator - INFO - Installing uncatalogued package: luaradio
+2025-08-26 21:13:35,138 - curator - INFO - Installing luaradio vlatest...
+2025-08-26 21:13:36,189 - curator - ERROR - Installation failed: 
+Error: No results matching query were found for Lua 5.1.
+To check if it is available for other Lua versions, use --check-lua-versions.
+
+2025-08-26 21:16:31,146 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-26 21:16:31,146 - curator - INFO - Loaded manifest: 10 packages
+2025-08-26 21:20:02,080 - curator - INFO - Installing uncatalogued package: gabby-lua
+2025-08-26 21:20:02,188 - curator - INFO - Installing gabby-lua vlatest...
+2025-08-26 21:20:04,962 - curator - ERROR - Installation failed: 
+Error: No results matching query were found for Lua 5.1.
+To check if it is available for other Lua versions, use --check-lua-versions.
+
+2025-08-26 21:26:27,042 - curator - INFO - Installing uncatalogued package: luasocket
+2025-08-26 21:26:27,161 - curator - INFO - Package luasocket already installed
+2025-08-26 21:26:27,248 - curator - INFO - Installing uncatalogued package: luafilesystem
+2025-08-26 21:26:27,373 - curator - INFO - Package luafilesystem already installed
+2025-08-26 21:26:27,468 - curator - INFO - Installing uncatalogued package: lua-cjson
+2025-08-26 21:26:27,583 - curator - INFO - Package lua-cjson already installed
+2025-08-26 21:26:37,925 - curator - INFO - Installing uncatalogued package: luaradio
+2025-08-26 21:26:38,035 - curator - INFO - Installing luaradio vlatest...
+2025-08-26 21:26:41,000 - curator - ERROR - Installation failed: 
+Error: No results matching query were found for Lua 5.1.
+To check if it is available for other Lua versions, use --check-lua-versions.
+
