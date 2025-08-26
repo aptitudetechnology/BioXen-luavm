@@ -641,34 +641,30 @@ print('🌙 BioXen VM ready! Profile: {selected_profile}')
         if not self.vm_status:
             print("📭 No persistent VMs available")
             return
-        
         choices = [Choice(f"{vm_id} ({status.name}) - {status.profile}", vm_id) 
                   for vm_id, status in self.vm_status.items()]
         choices.append(Choice("← Back to Menu", "back"))
-        
         vm_id = questionary.select("Select VM to attach to:", choices=choices).ask()
-        
         if not vm_id or vm_id == "back":
             return
-        
         try:
             print(f"\n🔗 Attaching to VM '{vm_id}' (Profile: {self.vm_status[vm_id].profile})")
             print("💡 Press Ctrl+D or type 'exit' to detach and return to menu")
             print("💡 The VM will continue running after detachment")
             print("💡 BioXen packages are available for use")
             print("-" * 70)
-            
             # Mark as attached
             self.vm_status[vm_id].attached = True
-            
-            # Attach to the VM session
+            # Attach to the VM session and run interactive loop
             session = self.vm_manager.attach_interactive_session(vm_id)
-            
             print(f"🔗 Successfully attached to VM '{vm_id}'")
             print("Type your Lua commands. VM will continue running when you detach.")
-            
+            session.interactive_loop()
         except Exception as e:
             print(f"❌ Failed to attach to VM: {e}")
+            import traceback
+            traceback.print_exc()
+            input("Press Enter to continue...")
             self.vm_status[vm_id].attached = False
     
     def detach_from_vm(self):
@@ -781,64 +777,99 @@ print('🌙 BioXen VM ready! Profile: {selected_profile}')
             # Current health check
             try:
                 current_health = self.curator.health_check()
-                print(f"\n🔍 Current System Health:")
-                print(f"   Packages Now: {current_health.get('installed_packages', 0)}")
-                print(f"   Critical Packages: {current_health.get('critical_packages_ratio', 'unknown')}")
-            except Exception as e:
-                print(f"   Health Check Error: {e}")
-            
-            if vm_alive:
-                # Try to get some runtime info
-                try:
-                    self.vm_manager.send_input(vm_id, "print('Health check:', os.date(), 'Packages available')\n")
-                    time.sleep(0.2)
-                    output = self.vm_manager.read_output(vm_id)
-                    if output:
-                        print(f"🔊 Last Response: {output.strip()}")
-                except:
-                    print("🔊 Last Response: Unable to query")
-            
-        except Exception as e:
-            print(f"❌ Error getting VM status: {e}")
-    
-    # ============ PRESERVED ORIGINAL FUNCTIONALITY ============
-    
-    def create_lua_vm(self):
-        """Create a one-shot interactive Lua VM (original functionality)"""
-        print("\n🌙 One-shot Interactive Lua VM")
-        print("This creates a temporary VM that exits when you're done")
-        print("For persistent VMs, use the hypervisor commands above")
-        print("-" * 70)
-        
-        try:
-            with self.vm_manager.create_interactive_session() as session:
-                print("✅ Lua VM created successfully!")
-                print("💡 Type 'exit' or press Ctrl+D to end session")
-                print("💡 All standard Lua libraries available")
-                print("-" * 50)
-                session.interactive_loop()
-                print("👋 Lua session ended")
-        except KeyboardInterrupt:
-            print("\n⚠️ Session interrupted by user")
-        except Exception as e:
-            print(f"❌ Error in Lua session: {e}")
-
-
-def main():
-    """Main entry point"""
-    print("🌙 BioXen Enhanced Interactive Lua VM Manager")
-    print("=" * 70)
-    
-    try:
-        with EnhancedInteractiveBioXen() as bioxen:
-            bioxen.main_menu()
-    except KeyboardInterrupt:
-        print("\n\n👋 Goodbye!")
-    except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-if __name__ == "__main__":
-    main()
+                def install_packages(self):
+                    """Install additional packages"""
+                    print("\n📦 Package Installation")
+                    try:
+                        # Show package recommendations first
+                        recommendations = self.curator.get_recommendations()
+                        installed = self.curator.list_installed_packages()
+                        installed_names = {pkg["name"] for pkg in installed}
+                        if recommendations:
+                            print("💡 Recommended packages:")
+                            for i, rec in enumerate(recommendations[:5], 1):
+                                status = "✅ Installed" if rec.name in installed_names else "⬜ Available"
+                                print(f"   {i}. {rec.name} - {rec.description} ({status})")
+                        # Installation options
+                        install_choice = questionary.select(
+                            "How would you like to install packages?",
+                            choices=[
+                                Choice("Install recommended package", "recommended"),
+                                Choice("Install specific package by name", "specific"),
+                                Choice("Install all recommendations", "all_recommended"),
+                                Choice("← Back to Menu", "back")
+                            ]
+                        ).ask()
+                        if not install_choice or install_choice == "back":
+                            print("↩️ Returning to main menu...")
+                            input("Press Enter to continue...")
+                            return
+                        if install_choice == "recommended" and recommendations:
+                            # Select from recommendations
+                            rec_choices = []
+                            for rec in recommendations:
+                                if rec.name not in installed_names:
+                                    rec_choices.append(Choice(f"{rec.name} - {rec.description}", rec.name))
+                            if not rec_choices:
+                                print("✅ All recommended packages already installed!")
+                                input("Press Enter to continue...")
+                                return
+                            package_name = questionary.select(
+                                "Select package to install:",
+                                choices=rec_choices
+                            ).ask()
+                            if package_name:
+                                success = self.curator.install_package(package_name)
+                                if success:
+                                    print(f"✅ Successfully installed {package_name}")
+                                else:
+                                    print(f"❌ Failed to install {package_name}")
+                                input("Press Enter to continue...")
+                            else:
+                                print("↩️ No package selected. Returning to menu...")
+                                input("Press Enter to continue...")
+                        elif install_choice == "specific":
+                            package_name = questionary.text("Enter package name to install:").ask()
+                            if package_name:
+                                version = questionary.text(
+                                    "Enter version constraint (or 'latest'):", 
+                                    default="latest"
+                                ).ask()
+                                success = self.curator.install_package(package_name, version or "latest")
+                                if success:
+                                    print(f"✅ Successfully installed {package_name}")
+                                else:
+                                    print(f"❌ Failed to install {package_name}")
+                                input("Press Enter to continue...")
+                            else:
+                                print("↩️ No package name entered. Returning to menu...")
+                                input("Press Enter to continue...")
+                        elif install_choice == "all_recommended":
+                            if not recommendations:
+                                print("📭 No recommendations available")
+                                input("Press Enter to continue...")
+                                return
+                            confirm = questionary.confirm(
+                                f"Install all {len(recommendations)} recommended packages?"
+                            ).ask()
+                            if confirm:
+                                print(f"🔄 Installing {len(recommendations)} packages...")
+                                success_count = 0
+                                for rec in recommendations:
+                                    if rec.name not in installed_names:
+                                        print(f"Installing {rec.name}...")
+                                        if self.curator.install_package(rec.name):
+                                            success_count += 1
+                                            print(f"   ✅ {rec.name} installed")
+                                        else:
+                                            print(f"   ❌ {rec.name} failed")
+                                print(f"📦 Installation complete: {success_count}/{len(recommendations)} successful")
+                                input("Press Enter to continue...")
+                            else:
+                                print("↩️ Cancelled. Returning to menu...")
+                                input("Press Enter to continue...")
+                    except Exception as e:
+                        print(f"❌ Package installation error: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        input("Press Enter to continue...")

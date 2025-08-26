@@ -6,13 +6,101 @@
     "luasocket": {
       "name": "luasocket",
       "version": "latest",
-      "category": "network",
-      "description": "Network support for Lua",
+      "category": "utility",
+      "description": "",
       "dependencies": [],
       "installed": false,
       "install_date": null,
       "source": "luarocks",
-      "priority": 8
+      "priority": 5
+    },
+    "lua-cjson": {
+      "name": "lua-cjson",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": false,
+      "install_date": null,
+      "source": "luarocks",
+      "priority": 5
+    },
+    "luafilesystem": {
+      "name": "luafilesystem",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": false,
+      "install_date": null,
+      "source": "luarocks",
+      "priority": 5
+    },
+    "penlight": {
+      "name": "penlight",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": true,
+      "install_date": "2025-08-26 16:01:33.638109",
+      "source": "luarocks",
+      "priority": 5
+    },
+    "inspect": {
+      "name": "inspect",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": true,
+      "install_date": "2025-08-26 16:01:38.587357",
+      "source": "luarocks",
+      "priority": 5
+    },
+    "lpeg": {
+      "name": "lpeg",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": true,
+      "install_date": "2025-08-26 16:01:59.040435",
+      "source": "luarocks",
+      "priority": 5
+    },
+    "lua-parser": {
+      "name": "lua-parser",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": true,
+      "install_date": "2025-08-26 16:02:08.012955",
+      "source": "luarocks",
+      "priority": 5
+    },
+    "busted": {
+      "name": "busted",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": true,
+      "install_date": "2025-08-26 16:02:34.079713",
+      "source": "luarocks",
+      "priority": 5
+    },
+    "luassert": {
+      "name": "luassert",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": false,
+      "install_date": null,
+      "source": "luarocks",
+      "priority": 5
     }
   },
   "profiles": {
@@ -84,5 +172,5 @@
       "penlight"
     ]
   },
-  "last_updated": "2025-08-26T14:38:50.768409"
+  "last_updated": "2025-08-26T16:02:34.285984"
 }

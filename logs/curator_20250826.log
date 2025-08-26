@@ -38,3 +38,53 @@ Error: Your user does not have write permissions in /usr/local/lib/luarocks/rock
 -- you may want to run as a privileged user or use your local tree with --local.
 
 2025-08-26 14:39:05,548 - curator - INFO - Environment curation complete: 0/3 packages installed
+2025-08-26 16:00:07,541 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-26 16:00:07,542 - curator - INFO - Loaded manifest: 1 packages
+2025-08-26 16:00:18,922 - curator - INFO - Curating environment with profile 'bioxen-minimal': 3 packages
+2025-08-26 16:00:19,051 - curator - INFO - Installing uncatalogued package: lua-cjson
+2025-08-26 16:00:19,167 - curator - INFO - Installing lua-cjson vlatest...
+2025-08-26 16:00:27,807 - curator - INFO - Successfully installed lua-cjson
+2025-08-26 16:00:27,899 - curator - INFO - Installing uncatalogued package: luafilesystem
+2025-08-26 16:00:28,020 - curator - INFO - Installing luafilesystem vlatest...
+2025-08-26 16:00:31,501 - curator - INFO - Successfully installed luafilesystem
+2025-08-26 16:00:31,672 - curator - INFO - Installing bio-utils vlatest...
+2025-08-26 16:00:32,676 - curator - ERROR - Installation failed: 
+Error: No results matching query were found for Lua 5.1.
+To check if it is available for other Lua versions, use --check-lua-versions.
+
+2025-08-26 16:00:32,676 - curator - INFO - Environment curation complete: 2/3 packages installed
+2025-08-26 16:01:25,715 - curator - INFO - Curating environment with profile 'full': 10 packages
+2025-08-26 16:01:25,838 - curator - INFO - Installing uncatalogued package: lua-cjson
+2025-08-26 16:01:25,956 - curator - INFO - Package lua-cjson already installed
+2025-08-26 16:01:26,045 - curator - INFO - Installing uncatalogued package: luafilesystem
+2025-08-26 16:01:26,155 - curator - INFO - Package luafilesystem already installed
+2025-08-26 16:01:26,247 - curator - INFO - Installing uncatalogued package: penlight
+2025-08-26 16:01:26,360 - curator - INFO - Installing penlight vlatest...
+2025-08-26 16:01:33,637 - curator - INFO - Successfully installed penlight
+2025-08-26 16:01:33,751 - curator - INFO - Installing uncatalogued package: inspect
+2025-08-26 16:01:33,847 - curator - INFO - Installing inspect vlatest...
+2025-08-26 16:01:38,587 - curator - INFO - Successfully installed inspect
+2025-08-26 16:01:38,680 - curator - INFO - Installing uncatalogued package: luasocket
+2025-08-26 16:01:38,785 - curator - INFO - Package luasocket already installed
+2025-08-26 16:01:38,873 - curator - INFO - Installing uncatalogued package: http
+2025-08-26 16:01:38,971 - curator - INFO - Installing http vlatest...
+2025-08-26 16:01:53,658 - curator - ERROR - Installation failed: 
+Error: Failed installing dependency: https://luarocks.org/cqueues-20200726.51-0.src.rock - Could not find header file for CRYPTO
+  No file openssl/crypto.h in /usr/local/include
+  No file openssl/crypto.h in /usr/include
+  No file openssl/crypto.h in /include
+You may have to install CRYPTO in your system and/or pass CRYPTO_DIR or CRYPTO_INCDIR to the luarocks command.
+Example: luarocks install cqueues CRYPTO_DIR=/usr/local
+
+2025-08-26 16:01:53,798 - curator - INFO - Installing uncatalogued package: lpeg
+2025-08-26 16:01:53,903 - curator - INFO - Installing lpeg vlatest...
+2025-08-26 16:01:59,040 - curator - INFO - Successfully installed lpeg
+2025-08-26 16:01:59,140 - curator - INFO - Installing uncatalogued package: lua-parser
+2025-08-26 16:01:59,297 - curator - INFO - Installing lua-parser vlatest...
+2025-08-26 16:02:08,012 - curator - INFO - Successfully installed lua-parser
+2025-08-26 16:02:08,117 - curator - INFO - Installing uncatalogued package: busted
+2025-08-26 16:02:08,228 - curator - INFO - Installing busted vlatest...
+2025-08-26 16:02:34,079 - curator - INFO - Successfully installed busted
+2025-08-26 16:02:34,169 - curator - INFO - Installing uncatalogued package: luassert
+2025-08-26 16:02:34,285 - curator - INFO - Package luassert already installed
+2025-08-26 16:02:34,286 - curator - INFO - Environment curation complete: 9/10 packages installed
