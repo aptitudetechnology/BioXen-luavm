@@ -112,6 +112,17 @@
       "install_date": "2025-08-26 21:13:12.688738",
       "source": "luarocks",
       "priority": 5
+    },
+    "biolib2d": {
+      "name": "biolib2d",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": true,
+      "install_date": "2025-08-27 00:18:26.287116",
+      "source": "luarocks",
+      "priority": 5
     }
   },
   "profiles": {
@@ -183,5 +194,5 @@
       "penlight"
     ]
   },
-  "last_updated": "2025-08-26T21:26:27.583418"
+  "last_updated": "2025-08-27T00:18:26.287393"
 }

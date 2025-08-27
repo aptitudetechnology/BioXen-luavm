@@ -1,0 +1,5 @@
+2025-08-27 00:17:45,622 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-27 00:17:45,622 - curator - INFO - Loaded manifest: 10 packages
+2025-08-27 00:18:18,311 - curator - INFO - Installing uncatalogued package: biolib2d
+2025-08-27 00:18:18,404 - curator - INFO - Installing biolib2d vlatest...
+2025-08-27 00:18:26,286 - curator - INFO - Successfully installed biolib2d

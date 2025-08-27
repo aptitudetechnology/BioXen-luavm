@@ -119,3 +119,5 @@ To check if it is available for other Lua versions, use --check-lua-versions.
 Error: No results matching query were found for Lua 5.1.
 To check if it is available for other Lua versions, use --check-lua-versions.
 
+2025-08-26 21:53:41,071 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-26 21:53:41,071 - curator - INFO - Loaded manifest: 10 packages
