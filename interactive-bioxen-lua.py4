@@ -71,7 +71,6 @@ class VMCLI:
                     Choice("🔗 Attach to existing VM", "attach_vm"),
                     Choice("📦 Install Packages", "install_packages"),
                     Choice("👤 Manage Profiles", "setup_profile"),
-                    Choice("🔧 Convert VM to Physical (eLua)", "convert_vm"),
                     Choice("🖥️  Environment Status", "env_status"),
                     Choice("📋 List VMs", "list_vms"),
                     Choice("🛑 Stop VM", "stop_vm"),
@@ -87,8 +86,6 @@ class VMCLI:
                 self.install_packages()
             elif action == "setup_profile":
                 self.setup_profile()
-            elif action == "convert_vm":
-                self.convert_vm_to_elua()
             elif action == "env_status":
                 self.show_environment_status()
             elif action == "list_vms":
@@ -100,7 +97,7 @@ class VMCLI:
                 sys.exit(0)
 
             # after each action (except long-running ones), wait for key
-            if action not in ["attach_vm", "env_status", "setup_profile", "convert_vm"]:
+            if action not in ["attach_vm", "env_status", "setup_profile"]:
                 questionary.press_any_key_to_continue().ask()
 
     def create_lua_vm(self):
@@ -329,57 +326,6 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             print("  • standard - Standard Lua environment")
             print("  • minimal - Minimal Lua setup")
             print("  • bioxen - Biological computation focus")
-
-    def convert_vm_to_elua(self):
-        """Convert a virtual Lua VM to physical eLua firmware - UI only, calls library methods"""
-        if not self.vm_status:
-            print("❌ No VMs available for conversion")
-            return
-
-        # Select VM to convert
-        vm_choices = [
-            Choice(f"{vm_id} (Profile: {status.profile}, Status: {'Running' if status.running else 'Stopped'})", vm_id)
-            for vm_id, status in self.vm_status.items()
-        ]
-        vm_choices.append(Choice("← Back to Menu", "back"))
-
-        vm_id = questionary.select("Select VM to convert to eLua:", choices=vm_choices).ask()
-        if not vm_id or vm_id == "back":
-            return
-
-        # Select target hardware
-        hardware_choice = questionary.select(
-            "Select target hardware:",
-            choices=[
-                Choice("ESP32 (WiFi, Bluetooth)", "esp32"),
-                Choice("ESP8266 (WiFi)", "esp8266"), 
-                Choice("STM32F4 (ARM Cortex-M4)", "stm32f4"),
-                Choice("STM32F1 (ARM Cortex-M3)", "stm32f1"),
-                Choice("Custom target", "custom"),
-                Choice("← Back", "back")
-            ]
-        ).ask()
-
-        if not hardware_choice or hardware_choice == "back":
-            return
-
-        try:
-            print(f"🔧 Converting VM '{vm_id}' to eLua for {hardware_choice.upper()}...")
-            
-            # These would be actual library calls once implemented:
-            # converter = self.vm_manager.get_elua_converter()
-            # result = converter.convert_vm_to_elua(vm_id, target=hardware_choice)
-            
-            # For now, just placeholder
-            print(f"✅ Conversion initiated (placeholder)")
-            print(f"📁 Would generate: elua_firmware_{vm_id}_{hardware_choice}.bin")
-            print(f"🎯 Target: {hardware_choice.upper()}")
-            print(f"⚠️  Note: Actual conversion logic to be implemented in pylua_bioxen_vm_lib")
-            
-        except Exception as e:
-            print(f"❌ Conversion failed: {e}")
-
-        input("Press Enter to continue...")
 
     def show_environment_status(self):
         print("\n🖥️  Environment Status:")
