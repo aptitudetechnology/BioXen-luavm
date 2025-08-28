@@ -71,7 +71,7 @@ class VMCLI:
                     Choice("🔗 Attach to existing VM", "attach_vm"),
                     Choice("📦 Install Packages", "install_packages"),
                     Choice("👤 Manage Profiles", "setup_profile"),
-                    Choice("🔧 Convert VM to Physical", "convert_vm"),
+                    Choice("🔧 Convert VM to Physical (eLua)", "convert_vm"),
                     Choice("🖥️  Environment Status", "env_status"),
                     Choice("📋 List VMs", "list_vms"),
                     Choice("🛑 Stop VM", "stop_vm"),
@@ -88,7 +88,7 @@ class VMCLI:
             elif action == "setup_profile":
                 self.setup_profile()
             elif action == "convert_vm":
-                self.convert_vm_to_physical()
+                self.convert_vm_to_elua()
             elif action == "env_status":
                 self.show_environment_status()
             elif action == "list_vms":
@@ -330,8 +330,8 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             print("  • minimal - Minimal Lua setup")
             print("  • bioxen - Biological computation focus")
 
-    def convert_vm_to_physical(self):
-        """Convert a virtual Lua VM to physical hardware - UI only, calls library methods"""
+    def convert_vm_to_elua(self):
+        """Convert a virtual Lua VM to physical eLua firmware - UI only, calls library methods"""
         if not self.vm_status:
             print("❌ No VMs available for conversion")
             return
@@ -343,33 +343,13 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
         ]
         vm_choices.append(Choice("← Back to Menu", "back"))
 
-        vm_id = questionary.select("Select VM to convert to physical hardware:", choices=vm_choices).ask()
+        vm_id = questionary.select("Select VM to convert to eLua:", choices=vm_choices).ask()
         if not vm_id or vm_id == "back":
             return
 
-        # Select target platform
-        platform_choice = questionary.select(
-            "Select target platform:",
-            choices=[
-                Choice("eLua (Embedded Lua)", "elua"),
-                Choice("Lumorphix", "lumorphix"),
-                Choice("← Back", "back")
-            ]
-        ).ask()
-
-        if not platform_choice or platform_choice == "back":
-            return
-
-        if platform_choice == "elua":
-            self._convert_to_elua(vm_id)
-        elif platform_choice == "lumorphix":
-            self._convert_to_lumorphix(vm_id)
-
-    def _convert_to_elua(self, vm_id):
-        """Handle eLua conversion flow"""
         # Select target hardware
         hardware_choice = questionary.select(
-            "Select eLua target hardware:",
+            "Select target hardware:",
             choices=[
                 Choice("ESP32 (WiFi, Bluetooth)", "esp32"),
                 Choice("ESP8266 (WiFi)", "esp8266"), 
@@ -391,54 +371,13 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             # result = converter.convert_vm_to_elua(vm_id, target=hardware_choice)
             
             # For now, just placeholder
-            print(f"✅ eLua conversion initiated (placeholder)")
+            print(f"✅ Conversion initiated (placeholder)")
             print(f"📁 Would generate: elua_firmware_{vm_id}_{hardware_choice}.bin")
-            print(f"🎯 Target: eLua on {hardware_choice.upper()}")
+            print(f"🎯 Target: {hardware_choice.upper()}")
             print(f"⚠️  Note: Actual conversion logic to be implemented in pylua_bioxen_vm_lib")
             
         except Exception as e:
-            print(f"❌ eLua conversion failed: {e}")
-
-        input("Press Enter to continue...")
-
-    def _convert_to_lumorphix(self, vm_id):
-        """Handle Lumorphix conversion flow"""
-        # Select target hardware
-        hardware_choice = questionary.select(
-            "Select Lumorphix target hardware:",
-            choices=[
-                Choice("Tang Nano 9k FPGA", "tang_nano_9k"),
-                Choice("ELM11", "elm11"),
-                Choice("← Back", "back")
-            ]
-        ).ask()
-
-        if not hardware_choice or hardware_choice == "back":
-            return
-
-        try:
-            print(f"🔧 Converting VM '{vm_id}' to Lumorphix for {hardware_choice.replace('_', ' ').title()}...")
-            
-            # These would be actual library calls once implemented:
-            # converter = self.vm_manager.get_lumorphix_converter()
-            # result = converter.convert_vm_to_lumorphix(vm_id, target=hardware_choice)
-            
-            # For now, just placeholder
-            print(f"✅ Lumorphix conversion initiated (placeholder)")
-            
-            if hardware_choice == "tang_nano_9k":
-                print(f"📁 Would generate: lumorphix_bitstream_{vm_id}_tang_nano_9k.bit")
-                print(f"🎯 Target: Lumorphix on Tang Nano 9k FPGA")
-                print(f"🔌 FPGA Configuration: Bitstream ready for Tang Nano 9k")
-            elif hardware_choice == "elm11":
-                print(f"📁 Would generate: lumorphix_firmware_{vm_id}_elm11.bin")
-                print(f"🎯 Target: Lumorphix on ELM11")
-                print(f"💾 Firmware: Ready for ELM11 flash")
-            
-            print(f"⚠️  Note: Actual conversion logic to be implemented in pylua_bioxen_vm_lib")
-            
-        except Exception as e:
-            print(f"❌ Lumorphix conversion failed: {e}")
+            print(f"❌ Conversion failed: {e}")
 
         input("Press Enter to continue...")
 
