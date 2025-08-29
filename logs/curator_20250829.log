@@ -7,3 +7,7 @@
 2025-08-29 19:52:33,201 - curator - INFO - Successfully installed gabby-lua
 2025-08-29 19:56:55,303 - curator - INFO - Installing uncatalogued package: gabby-lua
 2025-08-29 19:56:55,401 - curator - INFO - Package gabby-lua already installed
+2025-08-29 20:21:47,459 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-29 20:21:47,460 - curator - INFO - Loaded manifest: 12 packages
+2025-08-29 20:23:09,413 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-29 20:23:09,414 - curator - INFO - Loaded manifest: 12 packages
