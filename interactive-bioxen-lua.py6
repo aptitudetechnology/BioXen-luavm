@@ -223,170 +223,74 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             print(f"Error in interactive loop: {e}")
 
     def install_packages(self):
-        """Enhanced package installation with VM targeting"""
-        # First, check available targets
-        running_vms = {vm_id: status for vm_id, status in self.vm_status.items() 
-                       if status.running}
-        # Build target selection
-        target_choices = []
-        if running_vms:
-            target_choices.extend([
-                Choice(f"VM: {vm_id} ({status.profile} profile)", f"vm:{vm_id}")
-                for vm_id, status in running_vms.items()
-            ])
-        target_choices.append(Choice("Global system installation", "global"))
-        target_choices.append(Choice("← Back to Menu", "back"))
-        # Select installation target
-        target = questionary.select(
-            "Where would you like to install packages?",
-            choices=target_choices
-        ).ask()
-        if not target or target == "back":
-            return
-        # Parse target selection
-        is_vm_install = target.startswith("vm:")
-        target_vm_id = target.split(":", 1)[1] if is_vm_install else None
-        # Select installation type
         install_choice = questionary.select(
-            f"How would you like to install packages {'to ' + target_vm_id if is_vm_install else 'globally'}?",
+            "How would you like to install packages?",
             choices=[
                 Choice("Install specific package by name", "specific"),
-                Choice("Install recommended packages", "recommended"), 
+                Choice("Install recommended packages", "recommended"),
                 Choice("Show available packages", "show_available"),
-                Choice("← Back", "back_to_target")
+                Choice("← Back to Menu", "back")
             ],
             default="specific"
         ).ask()
-        if not install_choice or install_choice in ["back_to_target", "back"]:
-            if install_choice == "back_to_target":
-                self.install_packages()  # Restart from target selection
+
+        if not install_choice or install_choice == "back":
+            print("↩️ Returning to main menu...")
             return
+
         try:
             if install_choice == "specific":
                 package = questionary.text("Enter package name to install:").ask()
                 if package:
-                    self._install_single_package(package, is_vm_install, target_vm_id)
+                    print(f"🔄 Installing package: {package}")
+                    success = self.curator.install_package(package)
+                    if success:
+                        print(f"✅ Successfully installed: {package}")
+                    else:
+                        print(f"❌ Failed to install: {package}")
+
             elif install_choice == "recommended":
                 recommended = ["luasocket", "luafilesystem", "lua-cjson"]
                 confirm = questionary.confirm(
                     f"Install recommended packages: {', '.join(recommended)}?"
                 ).ask()
+                
                 if confirm:
-                    self._install_multiple_packages(recommended, is_vm_install, target_vm_id)
+                    success_count = 0
+                    for pkg in recommended:
+                        print(f"🔄 Installing {pkg}...")
+                        if self.curator.install_package(pkg):
+                            print(f"✅ {pkg} installed")
+                            success_count += 1
+                        else:
+                            print(f"❌ {pkg} failed")
+                    
+                    print(f"📦 Installation complete: {success_count}/{len(recommended)} successful")
+
             elif install_choice == "show_available":
-                self._show_package_status(is_vm_install, target_vm_id)
+                try:
+                    installed = self.curator.list_installed_packages()
+                    print("\n📦 Currently Installed Packages:")
+                    if installed:
+                        for pkg in installed:
+                            print(f"  • {pkg.get('name', 'unknown')} v{pkg.get('version', 'unknown')}")
+                    else:
+                        print("  No packages installed")
+                    
+                    # Show health check
+                    health = self.curator.health_check()
+                    print(f"\n🏥 System Health:")
+                    print(f"  Lua Version: {health.get('lua_version', 'unknown')}")
+                    print(f"  LuaRocks: {'Available' if health.get('luarocks_available') else 'Unavailable'}")
+                    print(f"  Total Packages: {health.get('installed_packages', 0)}")
+                    
+                except Exception as e:
+                    print(f"❌ Error showing packages: {e}")
+
         except Exception as e:
-            print(f"Package operation failed: {e}")
+            print(f"❌ Package operation failed: {e}")
+
         input("Press Enter to return to menu...")
-
-    def _install_single_package(self, package_name, is_vm_install, target_vm_id):
-        """Install a single package to VM or global"""
-        if is_vm_install:
-            print(f"Installing {package_name} to VM '{target_vm_id}'...")
-            success = self._install_package_to_vm(package_name, target_vm_id)
-            if success:
-                print(f"Successfully installed {package_name} to VM '{target_vm_id}'")
-                self._verify_package_in_vm(package_name, target_vm_id)
-            else:
-                print(f"Failed to install {package_name} to VM '{target_vm_id}'")
-        else:
-            print(f"Installing {package_name} globally...")
-            success = self.curator.install_package(package_name)
-            if success:
-                print(f"Successfully installed {package_name} globally")
-            else:
-                print(f"Failed to install {package_name} globally")
-
-    def _install_multiple_packages(self, packages, is_vm_install, target_vm_id):
-        """Install multiple packages with progress tracking"""
-        success_count = 0
-        target_desc = f"VM '{target_vm_id}'" if is_vm_install else "globally"
-        for pkg in packages:
-            print(f"Installing {pkg} {target_desc}...")
-            if is_vm_install:
-                success = self._install_package_to_vm(pkg, target_vm_id)
-            else:
-                success = self.curator.install_package(pkg)
-            if success:
-                print(f"{pkg} installed")
-                success_count += 1
-                if is_vm_install:
-                    self._verify_package_in_vm(pkg, target_vm_id)
-            else:
-                print(f"{pkg} failed")
-        print(f"Installation complete: {success_count}/{len(packages)} successful")
-
-    def _install_package_to_vm(self, package_name, vm_id):
-        """Install package directly to a specific VM"""
-        try:
-            # Send LuaRocks install command to VM
-            install_cmd = f'os.execute("luarocks install {package_name}")\n'
-            self.vm_manager.send_input(vm_id, install_cmd)
-            # Wait for command to complete
-            time.sleep(2.0)
-            # Read output to check for success
-            output = self.vm_manager.read_output(vm_id)
-            # Parse output for success indicators
-            if output:
-                output_lower = output.lower()
-                if "successfully installed" in output_lower or "is now installed" in output_lower:
-                    return True
-                elif "error" in output_lower or "failed" in output_lower:
-                    print(f"LuaRocks error: {output.strip()}")
-                    return False
-            # If no clear indication, assume success (LuaRocks can be quiet on success)
-            return True
-        except Exception as e:
-            print(f"Error installing {package_name} to VM {vm_id}: {e}")
-            return False
-
-    def _verify_package_in_vm(self, package_name, vm_id):
-        """Verify package can be loaded in VM"""
-        try:
-            # Try to require the package
-            verify_cmd = f'local ok, result = pcall(require, "{package_name}"); print("VERIFY:", ok and "SUCCESS" or "FAILED")\n'
-            self.vm_manager.send_input(vm_id, verify_cmd)
-            time.sleep(0.5)
-            output = self.vm_manager.read_output(vm_id)
-            if output and "VERIFY: SUCCESS" in output:
-                print(f"Verification: {package_name} loads successfully in VM '{vm_id}'")
-            elif output and "VERIFY: FAILED" in output:
-                print(f"Warning: {package_name} installed but cannot be loaded in VM '{vm_id}'")
-        except Exception as e:
-            print(f"Could not verify {package_name} in VM {vm_id}: {e}")
-
-    def _show_package_status(self, is_vm_install, target_vm_id):
-        """Show package status for VM or global"""
-        try:
-            if is_vm_install:
-                print(f"\nChecking packages in VM '{target_vm_id}'...")
-                # Send command to list installed packages in VM
-                list_cmd = 'os.execute("luarocks list")\n'
-                self.vm_manager.send_input(target_vm_id, list_cmd)
-                time.sleep(1.5)
-                output = self.vm_manager.read_output(target_vm_id)
-                if output:
-                    print("Installed packages in VM:")
-                    print(output.strip())
-                else:
-                    print("No package information available")
-            else:
-                # Use existing global package listing
-                installed = self.curator.list_installed_packages()
-                print("\nCurrently Installed Packages (Global):")
-                if installed:
-                    for pkg in installed:
-                        print(f"  • {pkg.get('name', 'unknown')} v{pkg.get('version', 'unknown')}")
-                else:
-                    print("  No packages installed globally")
-                # Show health check
-                health = self.curator.health_check()
-                print(f"\nSystem Health:")
-                print(f"  Lua Version: {health.get('lua_version', 'unknown')}")
-                print(f"  LuaRocks: {'Available' if health.get('luarocks_available') else 'Unavailable'}")
-                print(f"  Total Packages: {health.get('installed_packages', 0)}")
-        except Exception as e:
-            print(f"Error showing packages: {e}")
 
     def setup_profile(self):
         profile_choice = questionary.select(
