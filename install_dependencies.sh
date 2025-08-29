@@ -181,8 +181,8 @@ install_python_deps() {
         pip install -r requirements.txt
         print_success "Python dependencies installed from requirements.txt"
     else
-        print_warning "requirements.txt not found, installing pylua-bioxen-vm directly..."
-        pip install pylua-bioxen-vm
+        print_warning "requirements.txt not found, installing core Python Xen dependencies manually..."
+        pip install libvirt-python python-xenapi libxml2-python python-params
     fi
 }
 
@@ -211,22 +211,30 @@ main() {
     case $OS in
         "ubuntu")
             install_lua_ubuntu
+            print_status "Installing Xen and libvirt dependencies on Ubuntu/Debian..."
+            sudo apt install -y libvirt-dev xen-tools xen-hypervisor
             ;;
         "centos")
             install_lua_centos
+            print_status "Installing Xen and libvirt dependencies on CentOS/RHEL..."
+            sudo yum install -y libvirt-devel xen xen-tools
             ;;
         "fedora")
             install_lua_fedora
+            print_status "Installing Xen and libvirt dependencies on Fedora..."
+            sudo dnf install -y libvirt-devel xen xen-tools
             ;;
         "macos")
             install_lua_macos
+            print_warning "Xen and libvirt are not natively supported on macOS. Please use a Linux VM for Xen development."
             ;;
         *)
             print_error "Unsupported operating system: $OS"
-            print_error "Please install Lua and LuaSocket manually:"
+            print_error "Please install Lua, LuaSocket, Xen, and libvirt manually:"
             print_error "  - Lua interpreter (lua)"
             print_error "  - LuaRocks package manager"
             print_error "  - LuaSocket library (luarocks install luasocket)"
+            print_error "  - libvirt-dev, xen-tools, xen-hypervisor"
             exit 1
             ;;
     esac

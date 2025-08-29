@@ -1,3 +1,9 @@
-pylua-bioxen-vm-lib==0.1.18  # Python library for managing Lua VMs via subprocess
+# Xen VM management dependencies
+libvirt-python
+python-xenapi
+libxml2-python  # For XML configuration handling
+python-params   # For advanced configuration management
 
-questionary == 2.1.0
+# Existing dependencies
+pylua-bioxen-vm-lib==0.1.18  # Python library for managing Lua VMs via subprocess
+questionary==2.1.0
