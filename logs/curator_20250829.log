@@ -1,0 +1,9 @@
+2025-08-29 03:10:55,839 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-29 03:10:55,840 - curator - INFO - Loaded manifest: 11 packages
+2025-08-29 19:51:45,077 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-08-29 19:51:45,078 - curator - INFO - Loaded manifest: 11 packages
+2025-08-29 19:52:17,674 - curator - INFO - Installing uncatalogued package: gabby-lua
+2025-08-29 19:52:17,762 - curator - INFO - Installing gabby-lua vlatest...
+2025-08-29 19:52:33,201 - curator - INFO - Successfully installed gabby-lua
+2025-08-29 19:56:55,303 - curator - INFO - Installing uncatalogued package: gabby-lua
+2025-08-29 19:56:55,401 - curator - INFO - Package gabby-lua already installed

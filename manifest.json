@@ -123,6 +123,17 @@
       "install_date": "2025-08-27 00:18:26.287116",
       "source": "luarocks",
       "priority": 5
+    },
+    "gabby-lua": {
+      "name": "gabby-lua",
+      "version": "latest",
+      "category": "utility",
+      "description": "",
+      "dependencies": [],
+      "installed": false,
+      "install_date": null,
+      "source": "luarocks",
+      "priority": 5
     }
   },
   "profiles": {
@@ -194,5 +205,5 @@
       "penlight"
     ]
   },
-  "last_updated": "2025-08-27T00:18:26.287393"
+  "last_updated": "2025-08-29T19:56:55.402058"
 }
