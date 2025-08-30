@@ -1,2 +1,5 @@
 venv/
 __pycache__/
+
+# Exclude all contents of the iso folder
+iso/

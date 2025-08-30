@@ -1,7 +1,5 @@
 # Xen VM management dependencies
 libvirt-python
-python-xenapi
-libxml2-python  # For XML configuration handling
 python-params   # For advanced configuration management
 
 # Existing dependencies

@@ -103,6 +103,10 @@ class VMCLI:
                 self.cleanup()
                 sys.exit(0)
 
+            # after each action (except long-running ones), wait for key
+            if action not in ["attach_vm", "env_status", "setup_profile", "convert_vm"]:
+                questionary.press_any_key_to_continue().ask()
+
     def create_lua_vm(self):
         # Step 1: Choose VM type
         vm_type = questionary.select(
@@ -148,8 +152,26 @@ class VMCLI:
             self.vm_status[vm_id] = VMStatus(profile_name, "subprocess")
             self.vm_status[vm_id].running = True
 
-            print(f"✅ Subprocess VM '{vm_id}' created successfully. Use the 'Attach' option to connect to it.")
+            print(f"✅ Subprocess VM '{vm_id}' created with profile '{profile_name}'")
+            print("💡 Type 'exit' or press Ctrl+D to return to menu")
+            print("-" * 70)
+
+            # Mark as attached and enter interactive mode
+            self.vm_status[vm_id].attached = True
             
+            # Send welcome message
+            welcome_msg = f"""
+-- Subprocess VM '{vm_id}' started with {profile_name} profile
+print('🌙 VM ready! Type Lua commands or exit to return to menu')
+"""
+            self.vm_manager.send_input(vm_id, welcome_msg)
+            time.sleep(0.2)
+            
+            print("Entering interactive session...")
+            self._interactive_loop(vm_id)
+            
+            self.vm_status[vm_id].attached = False
+
         except Exception as e:
             print(f"❌ Failed to create subprocess VM: {e}")
             if vm_id in self.vm_status:
@@ -259,6 +281,10 @@ class VMCLI:
         
         # OS Template
         os_choices = [
+            Choice("Ubuntu 22.04 LTS", "ubuntu-22.04"),
+            Choice("Ubuntu 20.04 LTS", "ubuntu-20.04"),
+            Choice("Debian 12", "debian-12"),
+            Choice("Debian 11", "debian-11"),
             Choice("Alpine Linux", "alpine"),
             Choice("Custom ISO", "custom")
         ]
@@ -303,7 +329,9 @@ class VMCLI:
             boot_order = questionary.select(
                 "Boot order:",
                 choices=[
-                    Choice("CD-ROM first (virtual CD-ROM, ISO file installation)", "cd")
+                    Choice("CD-ROM first (for installation)", "cd"),
+                    Choice("Hard disk first", "hd"),
+                    Choice("Network (PXE) first", "network")
                 ]
             ).ask()
             xen_config['boot_order'] = boot_order
@@ -312,8 +340,16 @@ class VMCLI:
             console = questionary.confirm("Enable serial console access?").ask()
             xen_config['console'] = console
             
-            # For headless environments, SSH is recommended for remote access.
-            print("[INFO] VNC access is not available (no GUI). Use SSH for remote management.")
+            # VNC access
+            vnc = questionary.confirm("Enable VNC access?").ask()
+            xen_config['vnc'] = vnc
+            
+            if vnc:
+                vnc_port = questionary.text(
+                    "VNC port (default 5900):",
+                    default="5900"
+                ).ask()
+                xen_config['vnc_port'] = int(vnc_port) if vnc_port.isdigit() else 5900
         
         # Summary
         print("\n📋 Xen VM Configuration Summary:")
@@ -414,7 +450,7 @@ class VMCLI:
         print(f"⚠️  {console_choice.upper()} connection placeholder")
         print("Actual Xen VM interaction to be implemented")
         
-        questionary.press_any_key_to_continue().ask()
+        input("Press Enter to return to menu...")
 
     def _interactive_loop(self, vm_id):
         """Interactive loop for VM session"""
@@ -472,7 +508,7 @@ class VMCLI:
         if is_vm_install and self.vm_status[target_vm_id].vm_type == "xen":
             print("⚠️  Package installation to Xen VMs is a placeholder")
             print("Actual Xen VM package management to be implemented")
-            questionary.press_any_key_to_continue().ask()
+            input("Press Enter to continue...")
             return
         
         # Select installation type
@@ -507,7 +543,7 @@ class VMCLI:
                 self._show_package_status(is_vm_install, target_vm_id)
         except Exception as e:
             print(f"Package operation failed: {e}")
-        questionary.press_any_key_to_continue().ask()
+        input("Press Enter to return to menu...")
 
     def _install_single_package(self, package_name, is_vm_install, target_vm_id):
         """Install a single package to VM or global"""
@@ -655,8 +691,6 @@ class VMCLI:
             print("  • standard - Standard Lua environment")
             print("  • minimal - Minimal Lua setup")
             print("  • bioxen - Biological computation focus")
-        
-        questionary.press_any_key_to_continue().ask()
 
     def convert_vm_to_physical(self):
         """Convert a virtual Lua VM to physical hardware - UI only, calls library methods"""
@@ -680,7 +714,7 @@ class VMCLI:
         if vm_status.vm_type == "xen":
             print("⚠️  Xen VM to physical conversion requires different approach")
             print("Xen VMs already run on physical hardware via hypervisor")
-            questionary.press_any_key_to_continue().ask()
+            input("Press Enter to continue...")
             return
 
         # Select target platform
@@ -714,194 +748,4 @@ class VMCLI:
                 Choice("Custom target", "custom"),
                 Choice("← Back", "back")
             ]
-        ).ask()
-
-        if not hardware_choice or hardware_choice == "back":
-            return
-
-        try:
-            print(f"🔧 Converting VM '{vm_id}' to eLua for {hardware_choice.upper()}...")
-            
-            # These would be actual library calls once implemented:
-            # converter = self.vm_manager.get_elua_converter()
-            # result = converter.convert_vm_to_elua(vm_id, target=hardware_choice)
-            
-            # For now, just placeholder
-            print(f"✅ eLua conversion initiated (placeholder)")
-            print(f"📁 Would generate: elua_firmware_{vm_id}_{hardware_choice}.bin")
-            print(f"🎯 Target: eLua on {hardware_choice.upper()}")
-            print(f"⚠️  Note: Actual conversion logic to be implemented in pylua_bioxen_vm_lib")
-            
-        except Exception as e:
-            print(f"❌ eLua conversion failed: {e}")
-
-        questionary.press_any_key_to_continue().ask()
-
-    def _convert_to_lumorphix(self, vm_id):
-        """Handle Lumorphix conversion flow"""
-        # Select target hardware
-        hardware_choice = questionary.select(
-            "Select Lumorphix target hardware:",
-            choices=[
-                Choice("Tang Nano 9k FPGA", "tang_nano_9k"),
-                Choice("ELM11", "elm11"),
-                Choice("← Back", "back")
-            ]
-        ).ask()
-
-        if not hardware_choice or hardware_choice == "back":
-            return
-
-        try:
-            print(f"🔧 Converting VM '{vm_id}' to Lumorphix for {hardware_choice.replace('_', ' ').title()}...")
-            
-            # These would be actual library calls once implemented:
-            # converter = self.vm_manager.get_lumorphix_converter()
-            # result = converter.convert_vm_to_lumorphix(vm_id, target=hardware_choice)
-            
-            # For now, just placeholder
-            print(f"✅ Lumorphix conversion initiated (placeholder)")
-            
-            if hardware_choice == "tang_nano_9k":
-                print(f"📁 Would generate: lumorphix_bitstream_{vm_id}_tang_nano_9k.bit")
-                print(f"🎯 Target: Lumorphix on Tang Nano 9k FPGA")
-                print(f"🔌 FPGA Configuration: Bitstream ready for Tang Nano 9k")
-            elif hardware_choice == "elm11":
-                print(f"📁 Would generate: lumorphix_firmware_{vm_id}_elm11.bin")
-                print(f"🎯 Target: Lumorphix on ELM11")
-                print(f"💾 Firmware: Ready for ELM11 flash")
-            
-            print(f"⚠️  Note: Actual conversion logic to be implemented in pylua_bioxen_vm_lib")
-            
-        except Exception as e:
-            print(f"❌ Lumorphix conversion failed: {e}")
-
-        questionary.press_any_key_to_continue().ask()
-
-    def show_environment_status(self):
-        print("\n🖥️  Environment Status:")
-        
-        # VM status
-        if not self.vm_status:
-            print("  📭 No VMs created yet")
-        else:
-            print(f"  🖥️  Active VMs: {len(self.vm_status)}")
-            for vm_id, status in self.vm_status.items():
-                states = []
-                if status.running:
-                    states.append("Running")
-                if status.attached:
-                    states.append("Attached")
-                if not states:
-                    states.append("Stopped")
-                
-                print(f"    • {vm_id}: Profile={status.profile}, "
-                      f"Uptime={status.get_uptime()}, State={','.join(states)}")
-
-        # Environment health
-        try:
-            health = self.curator.health_check()
-            print(f"\n🏥 System Health:")
-            print(f"  🐍 Lua Version: {health.get('lua_version', 'unknown')}")
-            print(f"  📦 LuaRocks: {'Available' if health.get('luarocks_available') else 'Unavailable'}")
-            print(f"  📊 Packages: {health.get('installed_packages', 0)}")
-            
-            errors = self.env_manager.validate_environment()
-            if errors:
-                print(f"  ⚠️  Issues: {len(errors)} problems detected")
-            else:
-                print(f"  ✅ Environment: OK")
-                
-        except Exception as e:
-            print(f"  ❌ Health check error: {e}")
-        
-        questionary.press_any_key_to_continue().ask()
-
-
-    def list_vms(self):
-        if not self.vm_status:
-            print("📭 No VMs created")
-            return
-
-        print("\n🖥️  VM List:")
-        print("-" * 80)
-        
-        for vm_id, status in self.vm_status.items():
-            state_indicators = []
-            if status.running:
-                state_indicators.append("🟢 Running")
-            else:
-                state_indicators.append("🔴 Stopped")
-            
-            if status.attached:
-                state_indicators.append("🔗 Attached")
-            
-            print(f"VM ID: {vm_id}")
-            print(f"  Profile: {status.profile}")
-            print(f"  Status: {' '.join(state_indicators)}")
-            print(f"  Created: {status.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"  Uptime: {status.get_uptime()}")
-            print()
-
-        questionary.press_any_key_to_continue().ask()
-
-    def stop_vm(self):
-        if not self.vm_status:
-            print("📭 No VMs to stop")
-            return
-
-        running_vms = {vm_id: status for vm_id, status in self.vm_status.items() 
-                      if status.running}
-
-        if not running_vms:
-            print("📭 No running VMs to stop")
-            return
-
-        vm_choices = [
-            Choice(f"{vm_id} (Profile: {status.profile})", vm_id)
-            for vm_id, status in running_vms.items()
-        ]
-        vm_choices.append(Choice("← Back to Menu", "back"))
-
-        vm_id = questionary.select("Select VM to stop:", choices=vm_choices).ask()
-        if not vm_id or vm_id == "back":
-            return
-
-        confirm = questionary.confirm(
-            f"Stop VM '{vm_id}'? This will terminate the session."
-        ).ask()
-
-        if not confirm:
-            return
-
-        try:
-            self.vm_manager.terminate_vm_session(vm_id)
-            del self.vm_status[vm_id]
-            print(f"✅ VM '{vm_id}' stopped and removed")
-        except Exception as e:
-            print(f"❌ Failed to stop VM: {e}")
-            
-        questionary.press_any_key_to_continue().ask()
-
-    def cleanup(self):
-        print("\n🧹 Cleaning up running VMs...")
-        for vm_id in list(self.vm_status.keys()):
-            if self.vm_status[vm_id].running:
-                try:
-                    self.vm_manager.terminate_vm_session(vm_id)
-                    print(f"✅ VM {vm_id} terminated")
-                except Exception as e:
-                    print(f"⚠️  Could not terminate VM {vm_id}: {e}")
-        self.vm_status.clear()
-
-
-if __name__ == "__main__":
-    try:
-        cli = VMCLI()
-        cli.main_menu()
-    except KeyboardInterrupt:
-        print("\n👋 Goodbye!")
-    except Exception as e:
-        print(f"❌ Fatal error: {e}")
-        import traceback
-        traceback.print_exc()
+        ).ask
