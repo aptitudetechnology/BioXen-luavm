@@ -1,26 +1,7 @@
 #!/usr/bin/env python3
 """
-🧬 BioXen Lua VM Interactive CLI v0.1.20
-
-Enhanced CLI for managing BioXen Lua VMs with full XCP-ng hypervisor integration.
-
-Features:
-- Multi-VM support (Basic subprocess and XCP-ng hypervisor VMs)
-- XCP-ng XAPI integration with SSH session management  
-- Configuration management with credential storage
-- Template-based VM deployment on XCP-ng
-- Interactive Lua REPL with package management
-- VM lifecycle management and conversion tools
-
-Dependencies:
-- pylua_bioxen_vm_lib >= 0.1.20
-- questionary >= 1.0.0 (for interactive CLI)
-- requests >= 2.25.0 (for XCP-ng XAPI)
-- paramiko >= 2.7.0 (for SSH sessions)
-- urllib3 >= 1.26.0 (for HTTP requests)
-
-Author: BioXen Development Team
-Version: 0.1.20 (Phase 2 - Full XCP-ng Integration)
+BioXen Interactive CLI v0.1.19 with pylua_bioxen_vm_lib multi-VM support
+Supports Basic VMs and XCP-ng VMs (Phase 1 placeholder) using factory pattern
 """
 
 import os
@@ -40,21 +21,21 @@ except ImportError:
     sys.exit(1)
 
 try:
-    # Updated imports for pylua_bioxen_vm_lib version 0.1.20
+    # Updated imports for pylua_bioxen_vm_lib version 0.1.19
     from pylua_bioxen_vm_lib import VMManager, InteractiveSession, SessionManager, create_vm
     from pylua_bioxen_vm_lib.exceptions import (
         InteractiveSessionError, AttachError, DetachError, 
         SessionNotFoundError, SessionAlreadyExistsError, 
         VMManagerError, LuaVMError
     )
-    # Updated package management imports for 0.1.20 curator system
+    # Updated package management imports for 0.1.19 curator system
     from pylua_bioxen_vm_lib.utils.curator import (
         Curator, get_curator, quick_install, Package
     )
     from pylua_bioxen_vm_lib.env import EnvironmentManager
 except ImportError as e:
     print(f"❌ Import error: {e}")
-    print("Make sure pylua_bioxen_vm_lib>=0.1.20 is installed:")
+    print("Make sure pylua_bioxen_vm_lib>=0.1.19 is installed:")
     print("  pip install --upgrade pylua_bioxen_vm_lib")
     sys.exit(1)
 
@@ -88,15 +69,13 @@ class ConfigManager:
             return False
     
     def default_config(self):
-        """Return default configuration for 0.1.20"""
+        """Return default configuration"""
         return {
             "xcpng": {
-                "xcp_host": "192.168.1.100",
-                "xcp_username": "root",
-                "xcp_password": "",
-                "template_name": "ubuntu-20.04-lua",
-                "vm_username": "ubuntu",
-                "vm_password": "ubuntu",
+                "host": "192.168.1.100",
+                "username": "root",
+                "password": "",
+                "template": "lua-bio-template",
                 "save_credentials": False
             },
             "vm_defaults": {
@@ -111,24 +90,16 @@ class ConfigManager:
         """Get XCP-ng configuration"""
         return self.config.get("xcpng", {})
     
-    def get_xcpng_configs(self):
-        """Get all saved XCP-ng configurations"""
-        return self.config.get("xcpng_configs", {})
-    
-    def save_xcpng_config(self, config):
-        """Save XCP-ng configuration with 0.1.20 format"""
-        existing_configs = self.get_xcpng_configs()
-        
-        # Use host as the key
-        config_key = config['xcp_host']
-        existing_configs[config_key] = config
-        
-        self.config['xcpng_configs'] = existing_configs
-        self._save_config()
-        print(f"✅ XCP-ng configuration saved for {config_key}")
-        print(f"🔧 Template: {config['template_name']}")
-        print(f"👤 VM user: {config['vm_username']}")
-        print("🔐 Credentials stored securely in config file")
+    def save_xcpng_config(self, host, username, password, template, save_credentials=True):
+        """Save XCP-ng configuration"""
+        self.config["xcpng"] = {
+            "host": host,
+            "username": username,
+            "password": password if save_credentials else "",
+            "template": template,
+            "save_credentials": save_credentials
+        }
+        return self.save_config()
     
     def get_vm_defaults(self):
         """Get VM default settings"""
@@ -168,7 +139,7 @@ class VMCLI:
         print("\n[INFO] BioXen Interactive CLI started. If you do not see the menu below, check your terminal and Python environment.")
         while True:
             action = questionary.select(
-                "⚡ ModularNucleoid CLI v0.1.20 - VM Control",
+                "⚡ ModularNucleoid CLI v0.1.19 - VM Control",
                 choices=[
                     Choice("🚀 Create new Lua VM", "create_vm"),
                     Choice("🔗 Attach to existing VM", "attach_vm"),
@@ -206,12 +177,12 @@ class VMCLI:
                 sys.exit(0)
 
     def create_lua_vm(self):
-        # Step 1: Choose VM type using 0.1.20 multi-VM factory pattern
+        # Step 1: Choose VM type using 0.1.19 multi-VM factory pattern
         vm_type = questionary.select(
             "Select VM type:",
             choices=[
-                Choice("🐍 Basic VM (subprocess-based, local)", "basic"),
-                Choice("🌐 XCP-ng VM (hypervisor, full integration)", "xcpng"),
+                Choice("🐍 Basic VM (subprocess-based, default)", "basic"),
+                Choice("🌐 XCP-ng VM (hypervisor, Phase 1 placeholder)", "xcpng"),
                 Choice("← Back to Menu", "back")
             ]
         ).ask()
@@ -240,58 +211,39 @@ class VMCLI:
 
         config = None
         if vm_type == "xcpng":
-            # Get saved XCP-ng configurations for 0.1.20
-            saved_configs = self.config_manager.get_xcpng_configs()
-            fallback_config = self.config_manager.get_xcpng_config()
+            # Get saved XCP-ng configuration
+            saved_config = self.config_manager.get_xcpng_config()
             
-            config = None
-            if saved_configs:
-                # Multiple configurations available
-                if len(saved_configs) == 1:
-                    host, saved_config = next(iter(saved_configs.items()))
-                    use_saved = questionary.confirm(
-                        f"Use saved XCP-ng credentials for {host}?", 
-                        default=True
-                    ).ask()
-                    if use_saved:
-                        config = saved_config
-                else:
-                    # Multiple configs - let user choose
-                    choices = ["New configuration"] + [f"{host} ({cfg.get('template_name', 'unknown')})" for host, cfg in saved_configs.items()]
-                    choice = questionary.select(
-                        "Select XCP-ng configuration:",
-                        choices=choices
-                    ).ask()
-                    
-                    if choice != "New configuration":
-                        # Extract host from choice
-                        host = choice.split(" (")[0]
-                        config = saved_configs[host]
+            use_saved = False
+            if saved_config.get("save_credentials") and saved_config.get("password"):
+                use_saved = questionary.confirm(
+                    f"Use saved XCP-ng credentials for {saved_config.get('host')}?", 
+                    default=True
+                ).ask()
             
-            if config:
-                print(f"✅ Using saved credentials for {config['xcp_host']}")
+            if use_saved:
+                config = {
+                    "xcpng_host": saved_config.get("host"),
+                    "username": saved_config.get("username"),
+                    "password": saved_config.get("password"),
+                    "template": saved_config.get("template")
+                }
+                print(f"✅ Using saved credentials for {config['xcpng_host']}")
             else:
-                # Collect XCP-ng configuration with defaults from saved config for 0.1.20
-                defaults = fallback_config if fallback_config else self.config_manager.default_config()["xcpng"]
-                
-                xcp_host = questionary.text(
+                # Collect XCP-ng configuration with defaults from saved config
+                host = questionary.text(
                     "XCP-ng host IP:", 
-                    default=defaults.get("xcp_host", "192.168.1.100")
+                    default=saved_config.get("host", "192.168.1.100")
                 ).ask()
-                xcp_username = questionary.text(
-                    "XCP-ng username:", 
-                    default=defaults.get("xcp_username", "root")
+                username = questionary.text(
+                    "Username:", 
+                    default=saved_config.get("username", "root")
                 ).ask()
-                xcp_password = questionary.password("XCP-ng password:").ask()
-                template_name = questionary.text(
-                    "VM template name:", 
-                    default=defaults.get("template_name", "ubuntu-20.04-lua")
+                password = questionary.password("Password:").ask()
+                template = questionary.text(
+                    "Template name:", 
+                    default=saved_config.get("template", "lua-bio-template")
                 ).ask()
-                vm_username = questionary.text(
-                    "VM SSH username:", 
-                    default=defaults.get("vm_username", "ubuntu")
-                ).ask()
-                vm_password = questionary.password("VM SSH password:").ask()
                 
                 # Ask if user wants to save credentials
                 save_creds = questionary.confirm(
@@ -300,19 +252,21 @@ class VMCLI:
                 ).ask()
                 
                 config = {
-                    "xcp_host": xcp_host,
-                    "xcp_username": xcp_username,
-                    "xcp_password": xcp_password,
-                    "template_name": template_name,
-                    "vm_username": vm_username,
-                    "vm_password": vm_password
+                    "xcpng_host": host,
+                    "username": username,
+                    "password": password,
+                    "template": template
                 }
                 
                 # Save configuration if requested
                 if save_creds:
-                    config["save_credentials"] = True
-                    self.config_manager.save_xcpng_config(config)
-                    print("✅ Credentials saved to config file")
+                    success = self.config_manager.save_xcpng_config(
+                        host, username, password, template, True
+                    )
+                    if success:
+                        print("✅ Credentials saved to config file")
+                    else:
+                        print("❌ Failed to save credentials")
 
         if vm_type == "basic":
             self._create_basic_vm(vm_id, profile_name, networked, persistent, debug_mode)
@@ -368,12 +322,11 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
                 del self.vm_status[vm_id]
 
     def _create_xcpng_vm(self, vm_id, profile_name, config, networked=False, persistent=True, debug_mode=False):
-        """Create XCP-ng VM using 0.1.20 full implementation"""
+        """Create XCP-ng VM using 0.1.19 Phase 1 placeholder"""
         try:
             print(f"🔄 Creating XCP-ng VM '{vm_id}' with profile '{profile_name}'...")
-            print(f"🌐 Connecting to XCP-ng host: {config['xcp_host']}")
             
-            # Use 0.1.20 create_vm factory function with XCP-ng type
+            # Use 0.1.19 create_vm factory function with XCP-ng type
             vm_instance = create_vm(
                 vm_id=vm_id, 
                 vm_type="xcpng", 
@@ -383,31 +336,21 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
                 config=config
             )
             
-            # Start the VM (this now works in 0.1.20!)
-            print("🚀 Starting VM and establishing SSH connection...")
-            vm_instance.start()
-            
             # Track VM status with XCP-ng config
             self.vm_status[vm_id] = VMStatus(profile_name, "xcpng")
             self.vm_status[vm_id].xcpng_config = config
-            self.vm_status[vm_id].running = True
             
-            print(f"✅ XCP-ng VM '{vm_id}' created successfully!")
-            print(f"🔧 Host: {config['xcp_host']}, Template: {config['template_name']}")
-            print(f"🌐 SSH session established to VM")
-            print("💡 Use 'Attach to existing VM' to interact with this VM")
+            print(f"✅ XCP-ng VM '{vm_id}' configuration saved (Phase 1 placeholder)")
+            print(f"🔧 Host: {config['xcpng_host']}, Template: {config['template']}")
+            print("⚠️  Note: Actual XCP-ng VM creation will be implemented in Phase 2")
             
-            # Offer to attach immediately
-            attach_now = questionary.confirm("Attach to VM now?", default=True).ask()
-            if attach_now:
-                self.vm_status[vm_id].attached = True
-                print("Entering interactive XCP-ng VM session...")
-                self._interactive_loop(vm_id)
-                self.vm_status[vm_id].attached = False
-            
+        except NotImplementedError as e:
+            print(f"⚠️  XCP-ng VM Phase 1 placeholder: {e}")
+            # Still track the VM for demonstration
+            self.vm_status[vm_id] = VMStatus(profile_name, "xcpng")
+            self.vm_status[vm_id].xcpng_config = config
         except Exception as e:
             print(f"❌ Failed to create XCP-ng VM: {e}")
-            print("💡 Check XCP-ng host connectivity and credentials")
             if vm_id in self.vm_status:
                 del self.vm_status[vm_id]
             # self.vm_manager.create_xen_vm(vm_id, xen_config)
@@ -1161,184 +1104,54 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
                 self._clear_credentials()
 
     def _manage_xcpng_credentials(self):
-        """Manage XCP-ng credentials with 0.1.20 format"""
-        saved_configs = self.config_manager.get_xcpng_configs()
+        """Manage XCP-ng credentials"""
+        saved_config = self.config_manager.get_xcpng_config()
         
         print("\n🌐 XCP-ng Credentials Management")
         print("-" * 40)
         
-        if saved_configs:
-            print("📋 Saved Configurations:")
-            for host, config in saved_configs.items():
-                print(f"  🌐 Host: {host}")
-                print(f"    👤 XCP-ng User: {config.get('xcp_username', 'Not set')}")
-                print(f"    🏷️  Template: {config.get('template_name', 'Not set')}")
-                print(f"    👤 VM User: {config.get('vm_username', 'Not set')}")
-                print(f"    🔐 Passwords: {'✓ Set' if config.get('xcp_password') and config.get('vm_password') else '✗ Missing'}")
-                print()
+        if saved_config.get("save_credentials"):
+            print(f"Current Host: {saved_config.get('host', 'Not set')}")
+            print(f"Username: {saved_config.get('username', 'Not set')}")
+            print(f"Template: {saved_config.get('template', 'Not set')}")
+            print(f"Password: {'Saved' if saved_config.get('password') else 'Not saved'}")
         else:
-            print("📭 No configurations currently saved")
+            print("No credentials currently saved")
         
-        # Management options
-        if saved_configs:
-            choices = [
-                Choice("➕ Add new configuration", "add"),
-                Choice("✏️  Edit existing configuration", "edit"),
-                Choice("🗑️  Delete configuration", "delete"),
-                Choice("← Back", "back")
-            ]
-        else:
-            choices = [
-                Choice("➕ Add new configuration", "add"),
-                Choice("← Back", "back")
-            ]
-        
-        action = questionary.select(
-            "Select action:",
-            choices=choices
-        ).ask()
-        
-        if not action or action == "back":
+        # Allow editing
+        edit = questionary.confirm("Edit XCP-ng credentials?", default=True).ask()
+        if not edit:
             return
         
-        if action == "add":
-            self._add_xcpng_config()
-        elif action == "edit":
-            self._edit_xcpng_config(saved_configs)
-        elif action == "delete":
-            self._delete_xcpng_config(saved_configs)
+        host = questionary.text(
+            "XCP-ng host IP:", 
+            default=saved_config.get("host", "192.168.1.100")
+        ).ask()
+        username = questionary.text(
+            "Username:", 
+            default=saved_config.get("username", "root")
+        ).ask()
+        password = questionary.password("Password:").ask()
+        template = questionary.text(
+            "Template name:", 
+            default=saved_config.get("template", "lua-bio-template")
+        ).ask()
+        
+        save_creds = questionary.confirm(
+            "Save these credentials?", 
+            default=True
+        ).ask()
+        
+        if save_creds:
+            success = self.config_manager.save_xcpng_config(
+                host, username, password, template, True
+            )
+            if success:
+                print("✅ XCP-ng credentials saved successfully")
+            else:
+                print("❌ Failed to save credentials")
         
         questionary.press_any_key_to_continue().ask()
-
-    def _add_xcpng_config(self):
-        """Add new XCP-ng configuration"""
-        print("\n➕ Add New XCP-ng Configuration")
-        print("-" * 35)
-        
-        defaults = self.config_manager.default_config()["xcpng"]
-        
-        xcp_host = questionary.text(
-            "XCP-ng host IP:", 
-            default=defaults["xcp_host"]
-        ).ask()
-        xcp_username = questionary.text(
-            "XCP-ng username:", 
-            default=defaults["xcp_username"]
-        ).ask()
-        xcp_password = questionary.password("XCP-ng password:").ask()
-        template_name = questionary.text(
-            "VM template name:", 
-            default=defaults["template_name"]
-        ).ask()
-        vm_username = questionary.text(
-            "VM SSH username:", 
-            default=defaults["vm_username"]
-        ).ask()
-        vm_password = questionary.password("VM SSH password:").ask()
-        
-        config = {
-            "xcp_host": xcp_host,
-            "xcp_username": xcp_username,
-            "xcp_password": xcp_password,
-            "template_name": template_name,
-            "vm_username": vm_username,
-            "vm_password": vm_password,
-            "save_credentials": True
-        }
-        
-        self.config_manager.save_xcpng_config(config)
-    
-    def _edit_xcpng_config(self, saved_configs):
-        """Edit existing XCP-ng configuration"""
-        if not saved_configs:
-            return
-        
-        # Select configuration to edit
-        choices = [f"{host} ({cfg.get('template_name', 'unknown')})" for host, cfg in saved_configs.items()]
-        choice = questionary.select(
-            "Select configuration to edit:",
-            choices=choices
-        ).ask()
-        
-        if not choice:
-            return
-        
-        host = choice.split(" (")[0]
-        config = saved_configs[host]
-        
-        print(f"\n✏️  Editing Configuration for {host}")
-        print("-" * 40)
-        
-        # Edit fields
-        xcp_host = questionary.text(
-            "XCP-ng host IP:", 
-            default=config.get("xcp_host", "")
-        ).ask()
-        xcp_username = questionary.text(
-            "XCP-ng username:", 
-            default=config.get("xcp_username", "")
-        ).ask()
-        
-        change_password = questionary.confirm(
-            "Change XCP-ng password?", 
-            default=False
-        ).ask()
-        xcp_password = questionary.password("XCP-ng password:").ask() if change_password else config.get("xcp_password", "")
-        
-        template_name = questionary.text(
-            "VM template name:", 
-            default=config.get("template_name", "")
-        ).ask()
-        vm_username = questionary.text(
-            "VM SSH username:", 
-            default=config.get("vm_username", "")
-        ).ask()
-        
-        change_vm_password = questionary.confirm(
-            "Change VM SSH password?", 
-            default=False
-        ).ask()
-        vm_password = questionary.password("VM SSH password:").ask() if change_vm_password else config.get("vm_password", "")
-        
-        updated_config = {
-            "xcp_host": xcp_host,
-            "xcp_username": xcp_username,
-            "xcp_password": xcp_password,
-            "template_name": template_name,
-            "vm_username": vm_username,
-            "vm_password": vm_password,
-            "save_credentials": True
-        }
-        
-        self.config_manager.save_xcpng_config(updated_config)
-    
-    def _delete_xcpng_config(self, saved_configs):
-        """Delete XCP-ng configuration"""
-        if not saved_configs:
-            return
-        
-        # Select configuration to delete
-        choices = [f"{host} ({cfg.get('template_name', 'unknown')})" for host, cfg in saved_configs.items()]
-        choice = questionary.select(
-            "Select configuration to delete:",
-            choices=choices
-        ).ask()
-        
-        if not choice:
-            return
-        
-        host = choice.split(" (")[0]
-        
-        confirm = questionary.confirm(
-            f"⚠️  Delete configuration for {host}?",
-            default=False
-        ).ask()
-        
-        if confirm:
-            del saved_configs[host]
-            self.config_manager.config['xcpng_configs'] = saved_configs
-            self.config_manager._save_config()
-            print(f"✅ Configuration for {host} deleted")
 
     def _manage_vm_defaults(self):
         """Manage VM default settings"""
@@ -1391,26 +1204,17 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
 
     def _clear_credentials(self):
         """Clear saved credentials"""
-        saved_configs = self.config_manager.get_xcpng_configs()
-        
-        if not saved_configs:
-            print("📭 No credentials to clear")
-            questionary.press_any_key_to_continue().ask()
-            return
-        
         confirm = questionary.confirm(
-            f"Clear all {len(saved_configs)} saved XCP-ng configurations? This cannot be undone.", 
+            "Clear all saved credentials? This cannot be undone.", 
             default=False
         ).ask()
         
         if confirm:
-            self.config_manager.config['xcpng_configs'] = {}
-            # Also clear legacy xcpng config if it exists
-            if 'xcpng' in self.config_manager.config:
-                self.config_manager.config['xcpng'] = self.config_manager.default_config()['xcpng']
-            
-            self.config_manager._save_config()
-            print("✅ All XCP-ng credentials cleared")
+            self.config_manager.config = self.config_manager.default_config()
+            if self.config_manager.save_config():
+                print("✅ All credentials cleared")
+            else:
+                print("❌ Failed to clear credentials")
         
         questionary.press_any_key_to_continue().ask()
 
