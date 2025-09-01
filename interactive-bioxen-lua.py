@@ -373,6 +373,16 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             print(f"🔄 Creating XCP-ng VM '{vm_id}' with profile '{profile_name}'...")
             print(f"🌐 Connecting to XCP-ng host: {config['xcp_host']}")
             
+            # Convert our config format to what the library expects
+            library_config = {
+                "xcpng_host": config["xcp_host"],
+                "username": config["xcp_username"], 
+                "password": config["xcp_password"],
+                "template": config["template_name"],
+                "vm_username": config.get("vm_username", "ubuntu"),
+                "vm_password": config.get("vm_password", "ubuntu")
+            }
+            
             # Use 0.1.20 create_vm factory function with XCP-ng type
             vm_instance = create_vm(
                 vm_id=vm_id, 
@@ -380,7 +390,7 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
                 networked=networked, 
                 persistent=persistent, 
                 debug_mode=debug_mode,
-                config=config
+                config=library_config
             )
             
             # Start the VM (this now works in 0.1.20!)
@@ -408,17 +418,9 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
         except Exception as e:
             print(f"❌ Failed to create XCP-ng VM: {e}")
             print("💡 Check XCP-ng host connectivity and credentials")
-            if vm_id in self.vm_status:
-                del self.vm_status[vm_id]
-            # self.vm_manager.create_xen_vm(vm_id, xen_config)
-            
-            print(f"✅ Xen VM '{vm_id}' configuration saved")
-            print(f"🔧 Memory: {xen_config['memory']}MB, vCPUs: {xen_config['vcpus']}")
-            print(f"💽 Disk: {xen_config['disk_size']}GB, OS: {xen_config['os_template']}")
-            print("⚠️  Note: Actual Xen VM creation to be implemented in pylua_bioxen_vm_lib")
-            
-        except Exception as e:
-            print(f"❌ Failed to create Xen VM: {e}")
+            print(f"🔧 Host: {config['xcp_host']}, Template: {config['template_name']}")
+            print(f"� XCP-ng User: {config['xcp_username']}")
+            print(f"� VM User: {config.get('vm_username', 'ubuntu')}")
             if vm_id in self.vm_status:
                 del self.vm_status[vm_id]
 
