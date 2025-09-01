@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Fixed VMCLI with proper pylua_bioxen_vm_lib integration and Xen VM support
+BioXen Interactive CLI v0.1.19 with pylua_bioxen_vm_lib multi-VM support
+Supports Basic VMs and XCP-ng VMs (Phase 1 placeholder) using factory pattern
 """
 
 import os
@@ -70,7 +71,7 @@ class VMCLI:
         print("\n[INFO] BioXen Interactive CLI started. If you do not see the menu below, check your terminal and Python environment.")
         while True:
             action = questionary.select(
-                "⚡ ModularNucleoid CLI - VM Control",
+                "⚡ ModularNucleoid CLI v0.1.19 - VM Control",
                 choices=[
                     Choice("🚀 Create new Lua VM", "create_vm"),
                     Choice("🔗 Attach to existing VM", "attach_vm"),
@@ -569,7 +570,7 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
         questionary.press_any_key_to_continue().ask()
 
     def _install_single_package(self, package_name, is_vm_install, target_vm_id):
-        """Install a single package to VM or global"""
+        """Install a single package to VM or global using 0.1.19 PackageInstaller"""
         if is_vm_install:
             print(f"Installing {package_name} to VM '{target_vm_id}'...")
             success = self._install_package_to_vm(package_name, target_vm_id)
@@ -579,15 +580,15 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             else:
                 print(f"Failed to install {package_name} to VM '{target_vm_id}'")
         else:
-            print(f"Installing {package_name} globally...")
-            success = self.curator.install_package(package_name)
+            print(f"Installing {package_name} globally using 0.1.19 PackageInstaller...")
+            success = self.package_installer.install_package(package_name)
             if success:
                 print(f"Successfully installed {package_name} globally")
             else:
                 print(f"Failed to install {package_name} globally")
 
     def _install_multiple_packages(self, packages, is_vm_install, target_vm_id):
-        """Install multiple packages with progress tracking"""
+        """Install multiple packages with progress tracking using 0.1.19 APIs"""
         success_count = 0
         target_desc = f"VM '{target_vm_id}'" if is_vm_install else "globally"
         for pkg in packages:
@@ -595,7 +596,7 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             if is_vm_install:
                 success = self._install_package_to_vm(pkg, target_vm_id)
             else:
-                success = self.curator.install_package(pkg)
+                success = self.package_installer.install_package(pkg)
             if success:
                 print(f"{pkg} installed")
                 success_count += 1
@@ -645,7 +646,7 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             print(f"Could not verify {package_name} in VM {vm_id}: {e}")
 
     def _show_package_status(self, is_vm_install, target_vm_id):
-        """Show package status for VM or global"""
+        """Show package status for VM or global using 0.1.19 APIs"""
         try:
             if is_vm_install:
                 print(f"\nChecking packages in VM '{target_vm_id}'...")
@@ -660,20 +661,40 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
                 else:
                     print("No package information available")
             else:
-                # Use existing global package listing
-                installed = self.curator.list_installed_packages()
-                print("\nCurrently Installed Packages (Global):")
-                if installed:
-                    for pkg in installed:
-                        print(f"  • {pkg.get('name', 'unknown')} v{pkg.get('version', 'unknown')}")
-                else:
-                    print("  No packages installed globally")
+                # Use 0.1.19 search_packages and curator system
+                print("\nSearching available packages...")
+                try:
+                    available_packages = search_packages("*")  # Search all packages
+                    if available_packages:
+                        print("Available packages (sample):")
+                        for pkg in available_packages[:10]:  # Show first 10
+                            print(f"  • {pkg}")
+                    else:
+                        print("  No packages found in catalog")
+                except Exception as e:
+                    print(f"  Error searching packages: {e}")
+                
+                # Show installed packages using curator
+                try:
+                    installed = self.curator.list_installed_packages()
+                    print("\nCurrently Installed Packages (Global):")
+                    if installed:
+                        for pkg in installed:
+                            print(f"  • {pkg.get('name', 'unknown')} v{pkg.get('version', 'unknown')}")
+                    else:
+                        print("  No packages installed globally")
+                except Exception as e:
+                    print(f"  Error listing installed packages: {e}")
+                
                 # Show health check
-                health = self.curator.health_check()
-                print(f"\nSystem Health:")
-                print(f"  Lua Version: {health.get('lua_version', 'unknown')}")
-                print(f"  LuaRocks: {'Available' if health.get('luarocks_available') else 'Unavailable'}")
-                print(f"  Total Packages: {health.get('installed_packages', 0)}")
+                try:
+                    health = self.curator.health_check()
+                    print(f"\nSystem Health:")
+                    print(f"  Lua Version: {health.get('lua_version', 'unknown')}")
+                    print(f"  LuaRocks: {'Available' if health.get('luarocks_available') else 'Unavailable'}")
+                    print(f"  Total Packages: {health.get('installed_packages', 0)}")
+                except Exception as e:
+                    print(f"  Error checking system health: {e}")
         except Exception as e:
             print(f"Error showing packages: {e}")
 
