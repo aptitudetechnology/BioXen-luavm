@@ -3,3 +3,6 @@ __pycache__/
 
 # Exclude all contents of the iso folder
 iso/
+
+# Configuration files (may contain credentials)
+bioxen_config.json

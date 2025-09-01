@@ -8,8 +8,10 @@ import os
 import sys
 import signal
 import time
+import json
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+from pathlib import Path
 
 try:
     import questionary
@@ -28,7 +30,7 @@ try:
     )
     # Updated package management imports for 0.1.19 curator system
     from pylua_bioxen_vm_lib.utils.curator import (
-        Curator, get_curator, PackageInstaller, search_packages
+        Curator, get_curator, quick_install, Package
     )
     from pylua_bioxen_vm_lib.env import EnvironmentManager
 except ImportError as e:
@@ -36,6 +38,72 @@ except ImportError as e:
     print("Make sure pylua_bioxen_vm_lib>=0.1.19 is installed:")
     print("  pip install --upgrade pylua_bioxen_vm_lib")
     sys.exit(1)
+
+
+class ConfigManager:
+    """Manages configuration settings including XCP-ng credentials"""
+    
+    def __init__(self, config_file="bioxen_config.json"):
+        self.config_file = Path(config_file)
+        self.config = self.load_config()
+    
+    def load_config(self):
+        """Load configuration from file"""
+        if self.config_file.exists():
+            try:
+                with open(self.config_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"⚠️ Error loading config: {e}")
+                return self.default_config()
+        return self.default_config()
+    
+    def save_config(self):
+        """Save configuration to file"""
+        try:
+            with open(self.config_file, 'w') as f:
+                json.dump(self.config, f, indent=2)
+            return True
+        except Exception as e:
+            print(f"❌ Error saving config: {e}")
+            return False
+    
+    def default_config(self):
+        """Return default configuration"""
+        return {
+            "xcpng": {
+                "host": "192.168.1.100",
+                "username": "root",
+                "password": "",
+                "template": "lua-bio-template",
+                "save_credentials": False
+            },
+            "vm_defaults": {
+                "profile": "standard",
+                "networked": False,
+                "persistent": True,
+                "debug_mode": False
+            }
+        }
+    
+    def get_xcpng_config(self):
+        """Get XCP-ng configuration"""
+        return self.config.get("xcpng", {})
+    
+    def save_xcpng_config(self, host, username, password, template, save_credentials=True):
+        """Save XCP-ng configuration"""
+        self.config["xcpng"] = {
+            "host": host,
+            "username": username,
+            "password": password if save_credentials else "",
+            "template": template,
+            "save_credentials": save_credentials
+        }
+        return self.save_config()
+    
+    def get_vm_defaults(self):
+        """Get VM default settings"""
+        return self.config.get("vm_defaults", {})
 
 
 class VMStatus:
@@ -61,10 +129,10 @@ class VMCLI:
     def __init__(self):
         self.vm_manager = VMManager()
         self.vm_status = {}
+        self.config_manager = ConfigManager()
         
-        # Initialize 0.1.19 curator system with PackageInstaller
+        # Initialize 0.1.19 curator system 
         self.curator = get_curator()
-        self.package_installer = PackageInstaller()
         self.env_manager = EnvironmentManager()
 
     def main_menu(self):
@@ -77,6 +145,7 @@ class VMCLI:
                     Choice("🔗 Attach to existing VM", "attach_vm"),
                     Choice("📦 Install Packages", "install_packages"),
                     Choice("👤 Manage Profiles", "setup_profile"),
+                    Choice("⚙️  Configuration Settings", "config_settings"),
                     Choice("🔧 Convert VM to Physical", "convert_vm"),
                     Choice("🖥️  Environment Status", "env_status"),
                     Choice("📋 List VMs", "list_vms"),
@@ -93,6 +162,8 @@ class VMCLI:
                 self.install_packages()
             elif action == "setup_profile":
                 self.setup_profile()
+            elif action == "config_settings":
+                self.manage_configuration()
             elif action == "convert_vm":
                 self.convert_vm_to_physical()
             elif action == "env_status":
@@ -140,13 +211,62 @@ class VMCLI:
 
         config = None
         if vm_type == "xcpng":
-            # Collect XCP-ng configuration for Phase 1 placeholder
-            config = {
-                "xcpng_host": questionary.text("XCP-ng host IP:", default="192.168.1.100").ask(),
-                "username": questionary.text("Username:", default="root").ask(),
-                "password": questionary.password("Password:").ask(),
-                "template": questionary.text("Template name:", default="lua-bio-template").ask()
-            }
+            # Get saved XCP-ng configuration
+            saved_config = self.config_manager.get_xcpng_config()
+            
+            use_saved = False
+            if saved_config.get("save_credentials") and saved_config.get("password"):
+                use_saved = questionary.confirm(
+                    f"Use saved XCP-ng credentials for {saved_config.get('host')}?", 
+                    default=True
+                ).ask()
+            
+            if use_saved:
+                config = {
+                    "xcpng_host": saved_config.get("host"),
+                    "username": saved_config.get("username"),
+                    "password": saved_config.get("password"),
+                    "template": saved_config.get("template")
+                }
+                print(f"✅ Using saved credentials for {config['xcpng_host']}")
+            else:
+                # Collect XCP-ng configuration with defaults from saved config
+                host = questionary.text(
+                    "XCP-ng host IP:", 
+                    default=saved_config.get("host", "192.168.1.100")
+                ).ask()
+                username = questionary.text(
+                    "Username:", 
+                    default=saved_config.get("username", "root")
+                ).ask()
+                password = questionary.password("Password:").ask()
+                template = questionary.text(
+                    "Template name:", 
+                    default=saved_config.get("template", "lua-bio-template")
+                ).ask()
+                
+                # Ask if user wants to save credentials
+                save_creds = questionary.confirm(
+                    "Save these credentials for future use?", 
+                    default=False
+                ).ask()
+                
+                config = {
+                    "xcpng_host": host,
+                    "username": username,
+                    "password": password,
+                    "template": template
+                }
+                
+                # Save configuration if requested
+                if save_creds:
+                    success = self.config_manager.save_xcpng_config(
+                        host, username, password, template, True
+                    )
+                    if success:
+                        print("✅ Credentials saved to config file")
+                    else:
+                        print("❌ Failed to save credentials")
 
         if vm_type == "basic":
             self._create_basic_vm(vm_id, profile_name, networked, persistent, debug_mode)
@@ -570,7 +690,7 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
         questionary.press_any_key_to_continue().ask()
 
     def _install_single_package(self, package_name, is_vm_install, target_vm_id):
-        """Install a single package to VM or global using 0.1.19 PackageInstaller"""
+        """Install a single package to VM or global using 0.1.19 quick_install"""
         if is_vm_install:
             print(f"Installing {package_name} to VM '{target_vm_id}'...")
             success = self._install_package_to_vm(package_name, target_vm_id)
@@ -580,12 +700,15 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             else:
                 print(f"Failed to install {package_name} to VM '{target_vm_id}'")
         else:
-            print(f"Installing {package_name} globally using 0.1.19 PackageInstaller...")
-            success = self.package_installer.install_package(package_name)
-            if success:
-                print(f"Successfully installed {package_name} globally")
-            else:
-                print(f"Failed to install {package_name} globally")
+            print(f"Installing {package_name} globally using 0.1.19 quick_install...")
+            try:
+                success = quick_install(package_name)
+                if success:
+                    print(f"Successfully installed {package_name} globally")
+                else:
+                    print(f"Failed to install {package_name} globally")
+            except Exception as e:
+                print(f"Error installing {package_name}: {e}")
 
     def _install_multiple_packages(self, packages, is_vm_install, target_vm_id):
         """Install multiple packages with progress tracking using 0.1.19 APIs"""
@@ -596,7 +719,11 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             if is_vm_install:
                 success = self._install_package_to_vm(pkg, target_vm_id)
             else:
-                success = self.package_installer.install_package(pkg)
+                try:
+                    success = quick_install(pkg)
+                except Exception as e:
+                    print(f"Error installing {pkg}: {e}")
+                    success = False
             if success:
                 print(f"{pkg} installed")
                 success_count += 1
@@ -661,19 +788,6 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
                 else:
                     print("No package information available")
             else:
-                # Use 0.1.19 search_packages and curator system
-                print("\nSearching available packages...")
-                try:
-                    available_packages = search_packages("*")  # Search all packages
-                    if available_packages:
-                        print("Available packages (sample):")
-                        for pkg in available_packages[:10]:  # Show first 10
-                            print(f"  • {pkg}")
-                    else:
-                        print("  No packages found in catalog")
-                except Exception as e:
-                    print(f"  Error searching packages: {e}")
-                
                 # Show installed packages using curator
                 try:
                     installed = self.curator.list_installed_packages()
@@ -961,6 +1075,147 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
         except Exception as e:
             print(f"❌ Failed to stop VM: {e}")
             
+        questionary.press_any_key_to_continue().ask()
+
+    def manage_configuration(self):
+        """Manage application configuration settings"""
+        while True:
+            config_action = questionary.select(
+                "⚙️  Configuration Settings",
+                choices=[
+                    Choice("🌐 XCP-ng Credentials", "xcpng_creds"),
+                    Choice("🎯 VM Default Settings", "vm_defaults"),
+                    Choice("📄 View Current Config", "view_config"),
+                    Choice("🗑️  Clear Saved Credentials", "clear_creds"),
+                    Choice("← Back to Main Menu", "back")
+                ]
+            ).ask()
+
+            if not config_action or config_action == "back":
+                break
+
+            if config_action == "xcpng_creds":
+                self._manage_xcpng_credentials()
+            elif config_action == "vm_defaults":
+                self._manage_vm_defaults()
+            elif config_action == "view_config":
+                self._view_configuration()
+            elif config_action == "clear_creds":
+                self._clear_credentials()
+
+    def _manage_xcpng_credentials(self):
+        """Manage XCP-ng credentials"""
+        saved_config = self.config_manager.get_xcpng_config()
+        
+        print("\n🌐 XCP-ng Credentials Management")
+        print("-" * 40)
+        
+        if saved_config.get("save_credentials"):
+            print(f"Current Host: {saved_config.get('host', 'Not set')}")
+            print(f"Username: {saved_config.get('username', 'Not set')}")
+            print(f"Template: {saved_config.get('template', 'Not set')}")
+            print(f"Password: {'Saved' if saved_config.get('password') else 'Not saved'}")
+        else:
+            print("No credentials currently saved")
+        
+        # Allow editing
+        edit = questionary.confirm("Edit XCP-ng credentials?", default=True).ask()
+        if not edit:
+            return
+        
+        host = questionary.text(
+            "XCP-ng host IP:", 
+            default=saved_config.get("host", "192.168.1.100")
+        ).ask()
+        username = questionary.text(
+            "Username:", 
+            default=saved_config.get("username", "root")
+        ).ask()
+        password = questionary.password("Password:").ask()
+        template = questionary.text(
+            "Template name:", 
+            default=saved_config.get("template", "lua-bio-template")
+        ).ask()
+        
+        save_creds = questionary.confirm(
+            "Save these credentials?", 
+            default=True
+        ).ask()
+        
+        if save_creds:
+            success = self.config_manager.save_xcpng_config(
+                host, username, password, template, True
+            )
+            if success:
+                print("✅ XCP-ng credentials saved successfully")
+            else:
+                print("❌ Failed to save credentials")
+        
+        questionary.press_any_key_to_continue().ask()
+
+    def _manage_vm_defaults(self):
+        """Manage VM default settings"""
+        defaults = self.config_manager.get_vm_defaults()
+        
+        print("\n🎯 VM Default Settings")
+        print("-" * 30)
+        
+        profile = questionary.text(
+            "Default profile:", 
+            default=defaults.get("profile", "standard")
+        ).ask()
+        
+        networked = questionary.confirm(
+            "Enable networking by default?", 
+            default=defaults.get("networked", False)
+        ).ask()
+        
+        persistent = questionary.confirm(
+            "Enable persistent sessions by default?", 
+            default=defaults.get("persistent", True)
+        ).ask()
+        
+        debug_mode = questionary.confirm(
+            "Enable debug mode by default?", 
+            default=defaults.get("debug_mode", False)
+        ).ask()
+        
+        # Update config
+        self.config_manager.config["vm_defaults"] = {
+            "profile": profile,
+            "networked": networked,
+            "persistent": persistent,
+            "debug_mode": debug_mode
+        }
+        
+        if self.config_manager.save_config():
+            print("✅ VM defaults saved successfully")
+        else:
+            print("❌ Failed to save VM defaults")
+        
+        questionary.press_any_key_to_continue().ask()
+
+    def _view_configuration(self):
+        """View current configuration"""
+        print("\n📄 Current Configuration")
+        print("=" * 50)
+        print(json.dumps(self.config_manager.config, indent=2))
+        questionary.press_any_key_to_continue().ask()
+
+    def _clear_credentials(self):
+        """Clear saved credentials"""
+        confirm = questionary.confirm(
+            "Clear all saved credentials? This cannot be undone.", 
+            default=False
+        ).ask()
+        
+        if confirm:
+            self.config_manager.config = self.config_manager.default_config()
+            if self.config_manager.save_config():
+                print("✅ All credentials cleared")
+            else:
+                print("❌ Failed to clear credentials")
+        
         questionary.press_any_key_to_continue().ask()
 
     def cleanup(self):
