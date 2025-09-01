@@ -53,9 +53,10 @@ try:
         Curator, get_curator, quick_install, Package
     )
     from pylua_bioxen_vm_lib.env import EnvironmentManager
-    # Phase 3 additions - XAPI and SSH integration
+    # Phase 3 additions - XAPI and SSH integration (corrected imports)
     from pylua_bioxen_vm_lib.xapi_client import XAPIClient
-    from pylua_bioxen_vm_lib.ssh_session import SSHSession
+    from pylua_bioxen_vm_lib.ssh_session import SSHSessionManager
+    from pylua_bioxen_vm_lib.xcp_ng_integration import XCPngVM
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure pylua_bioxen_vm_lib>=0.1.22 is installed:")

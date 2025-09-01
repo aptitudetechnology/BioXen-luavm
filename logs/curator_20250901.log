@@ -10,3 +10,7 @@
 2025-09-01 14:02:54,433 - curator - INFO - Loaded manifest: 12 packages
 2025-09-01 14:04:13,194 - curator - INFO - Detected Lua at: /usr/bin/lua
 2025-09-01 14:04:13,194 - curator - INFO - Loaded manifest: 12 packages
+2025-09-01 16:13:46,426 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-09-01 16:13:46,455 - curator - INFO - Loaded manifest: 12 packages
+2025-09-01 16:15:04,543 - curator - INFO - Detected Lua at: /usr/bin/lua
+2025-09-01 16:15:04,543 - curator - INFO - Loaded manifest: 12 packages

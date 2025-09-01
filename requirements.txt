@@ -3,5 +3,5 @@
 #python-params   # For advanced configuration management
 
 # Existing dependencies
-pylua-bioxen-vm-lib==0.1.18  # Python library for managing Lua VMs via subprocess
+pylua-bioxen-vm-lib==0.1.22  # Python library for managing Lua VMs via subprocess
 questionary==2.1.0

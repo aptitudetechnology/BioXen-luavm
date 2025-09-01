@@ -3,3 +3,8 @@
 {"timestamp": "2025-09-01T14:03:51.196824", "level": "DEBUG", "component": "LuaProcess", "message": "Lua verification successful: ", "context": {}, "duration": null}
 {"timestamp": "2025-09-01T14:03:55.364148", "level": "DEBUG", "component": "NetworkedLuaVM", "message": "Cleaning up 0 temporary scripts and stopping interactive session", "context": {}, "duration": null}
 {"timestamp": "2025-09-01T14:03:55.365131", "level": "DEBUG", "component": "NetworkedLuaVM", "message": "Cleanup completed", "context": {}, "duration": null}
+{"timestamp": "2025-09-01T16:15:16.988379", "level": "DEBUG", "component": "LuaProcess", "message": "Initializing LuaProcess: name='3', executable='lua'", "context": {}, "duration": null}
+{"timestamp": "2025-09-01T16:15:16.989240", "level": "DEBUG", "component": "LuaProcess", "message": "Verifying Lua executable availability: 'lua'", "context": {}, "duration": null}
+{"timestamp": "2025-09-01T16:15:16.996605", "level": "DEBUG", "component": "LuaProcess", "message": "Lua verification successful: ", "context": {}, "duration": null}
+{"timestamp": "2025-09-01T16:15:23.589573", "level": "DEBUG", "component": "NetworkedLuaVM", "message": "Cleaning up 0 temporary scripts and stopping interactive session", "context": {}, "duration": null}
+{"timestamp": "2025-09-01T16:15:23.592121", "level": "DEBUG", "component": "NetworkedLuaVM", "message": "Cleanup completed", "context": {}, "duration": null}

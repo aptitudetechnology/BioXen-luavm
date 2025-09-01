@@ -1,3 +1,6 @@
 2025-09-01 14:03:51,188 - pylua_vm.luaprocess - DEBUG - debug:195 - Initializing LuaProcess: name='2', executable='lua'
 2025-09-01 14:03:51,189 - pylua_vm.luaprocess - DEBUG - debug:195 - Verifying Lua executable availability: 'lua'
 2025-09-01 14:03:51,196 - pylua_vm.luaprocess - DEBUG - debug:195 - Lua verification successful: 
+2025-09-01 16:15:16,988 - pylua_vm.luaprocess - DEBUG - debug:195 - Initializing LuaProcess: name='3', executable='lua'
+2025-09-01 16:15:16,989 - pylua_vm.luaprocess - DEBUG - debug:195 - Verifying Lua executable availability: 'lua'
+2025-09-01 16:15:16,996 - pylua_vm.luaprocess - DEBUG - debug:195 - Lua verification successful: 
