@@ -124,7 +124,7 @@ class ConfigManager:
         existing_configs[config_key] = config
         
         self.config['xcpng_configs'] = existing_configs
-        self._save_config()
+        self.save_config()
         print(f"✅ XCP-ng configuration saved for {config_key}")
         print(f"🔧 Template: {config['template_name']}")
         print(f"👤 VM user: {config['vm_username']}")
@@ -1337,7 +1337,7 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
         if confirm:
             del saved_configs[host]
             self.config_manager.config['xcpng_configs'] = saved_configs
-            self.config_manager._save_config()
+            self.config_manager.save_config()
             print(f"✅ Configuration for {host} deleted")
 
     def _manage_vm_defaults(self):
@@ -1409,7 +1409,7 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             if 'xcpng' in self.config_manager.config:
                 self.config_manager.config['xcpng'] = self.config_manager.default_config()['xcpng']
             
-            self.config_manager._save_config()
+            self.config_manager.save_config()
             print("✅ All XCP-ng credentials cleared")
         
         questionary.press_any_key_to_continue().ask()
