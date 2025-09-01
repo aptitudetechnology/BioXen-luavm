@@ -27,15 +27,22 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from pylua_vm import VMManager, SessionManager, create_vm, InteractiveSession
-    from pylua_vm.exceptions import (
+    # Updated imports for pylua_bioxen_vm_lib version 0.1.19
+    from pylua_bioxen_vm_lib import VMManager, SessionManager, create_vm, InteractiveSession
+    from pylua_bioxen_vm_lib.exceptions import (
         InteractiveSessionError, AttachError, DetachError, 
         SessionNotFoundError, SessionAlreadyExistsError, 
-        VMManagerError, ProcessRegistryError
+        VMManagerError, LuaVMError
     )
+    # Updated package management imports
+    from pylua_bioxen_vm_lib.utils.curator import (
+        Curator, get_curator, PackageInstaller, search_packages
+    )
+    from pylua_bioxen_vm_lib.env import EnvironmentManager
 except ImportError as e:
     print(f"❌ Import error: {e}")
-    print("Make sure you're running from the BioXen root directory")
+    print("Make sure pylua_bioxen_vm_lib>=0.1.19 is installed:")
+    print("  pip install --upgrade pylua_bioxen_vm_lib")
     sys.exit(1)
 
 try:
@@ -208,7 +215,7 @@ class EnhancedInteractiveBioXen:
                     print(f"VM ID: {vm_id} - Error: {e}")
     
     def start_persistent_vm(self):
-        """Start a new persistent Lua VM"""
+        """Start a new persistent Lua VM using 0.1.19 multi-VM factory pattern"""
         print("\n🚀 Start Persistent Lua VM")
         
         vm_id = questionary.text("Enter VM ID (unique identifier):", 
@@ -220,27 +227,55 @@ class EnhancedInteractiveBioXen:
         if not vm_name:
             vm_name = f"LuaVM-{vm_id}"
         
+        # Choose VM type using new 0.1.19 factory pattern
+        vm_type = questionary.select(
+            "Select VM type:",
+            choices=[
+                Choice("🐍 Basic VM (subprocess-based)", "basic"),
+                Choice("🌐 XCP-ng VM (hypervisor, Phase 2)", "xcpng"),
+                Choice("← Back", "back")
+            ]
+        ).ask()
+        
+        if not vm_type or vm_type == "back":
+            return
+        
         networked = questionary.confirm("Enable networking capabilities?", default=False).ask()
+        persistent = questionary.confirm("Enable persistent sessions?", default=True).ask()
+        debug_mode = questionary.confirm("Enable debug mode?", default=False).ask()
+        
+        config = None
+        if vm_type == "xcpng":
+            # Collect XCP-ng configuration
+            config = {
+                "xcpng_host": questionary.text("XCP-ng host IP:", default="192.168.1.100").ask(),
+                "username": questionary.text("Username:", default="root").ask(),
+                "password": questionary.password("Password:").ask(),
+                "template": questionary.text("Template name:", default="lua-bio-template").ask()
+            }
         
         try:
-            print(f"🔄 Creating persistent VM '{vm_id}'...")
+            print(f"🔄 Creating persistent VM '{vm_id}' (type: {vm_type})...")
             
-            if networked:
-                # Create networked VM
-                vm_instance = create_vm(vm_id, networked=True)
-                # Convert to interactive session
-                session = self.vm_manager.create_interactive_vm(f"{vm_id}_interactive")
-                actual_vm_id = f"{vm_id}_interactive"
-            else:
-                # Create interactive VM directly
-                session = self.vm_manager.create_interactive_vm(vm_id)
-                actual_vm_id = vm_id
+            # Use new 0.1.19 multi-VM factory pattern
+            vm_instance = create_vm(
+                vm_id=vm_id, 
+                vm_type=vm_type, 
+                networked=networked, 
+                persistent=persistent, 
+                debug_mode=debug_mode,
+                config=config
+            )
+            
+            # Create interactive session using VMManager
+            session = self.vm_manager.create_interactive_vm(vm_id)
             
             # Register VM status
-            self.vm_status[actual_vm_id] = VMStatus(actual_vm_id, vm_name, datetime.now())
+            self.vm_status[vm_id] = VMStatus(vm_id, vm_name, datetime.now())
             
-            # Send initial setup commands
-            self.vm_manager.send_input(actual_vm_id, "print('Persistent VM started. Type Lua commands here.')\n")
+            if vm_type == "basic":
+                # Send initial setup commands for basic VMs
+                self.vm_manager.send_input(vm_id, "print('Persistent VM started. Type Lua commands here.')\n")
             time.sleep(0.2)
             
             print(f"✅ Persistent VM '{actual_vm_id}' started successfully!")
@@ -571,6 +606,9 @@ class EnhancedInteractiveBioXen:
                     Choice("🛑 Stop Persistent VM", "stop_vm"),
                     Choice("📊 VM Detailed Status", "vm_status"),
                     Choice("────────────────────", "separator"),
+                    # Package management
+                    Choice("📦 Package Management", "package_mgmt"),
+                    Choice("────────────────────", "separator2"),
                     # Original functionality
                     Choice("🌙 One-shot Lua VM (Original)", "create_lua_vm"),
                     Choice("────────────────────", "separator2"),

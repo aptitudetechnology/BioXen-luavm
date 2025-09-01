@@ -18,36 +18,36 @@ except ImportError:
     sys.exit(1)
 
 try:
-    # Updated imports for pylua_bioxen_vm_lib version 0.1.19
-    from pylua_bioxen_vm_lib import VMManager, InteractiveSession, SessionManager, create_vm
+    # Correct pylua_bioxen_vm_lib imports
+    from pylua_bioxen_vm_lib import VMManager, InteractiveSession, SessionManager
     from pylua_bioxen_vm_lib.exceptions import (
         InteractiveSessionError, AttachError, DetachError, 
         SessionNotFoundError, SessionAlreadyExistsError, 
         VMManagerError, LuaVMError
     )
-    # Updated package management imports for 0.1.19 curator system
+    # Curator system imports for package management
     from pylua_bioxen_vm_lib.utils.curator import (
-        Curator, get_curator, PackageInstaller, search_packages
+        Curator, get_curator, bootstrap_lua_environment, Package
     )
     from pylua_bioxen_vm_lib.env import EnvironmentManager
 except ImportError as e:
     print(f"❌ Import error: {e}")
-    print("Make sure pylua_bioxen_vm_lib>=0.1.19 is installed:")
+    print("Make sure pylua_bioxen_vm_lib>=0.1.6 is installed:")
     print("  pip install --upgrade pylua_bioxen_vm_lib")
     sys.exit(1)
 
 
 class VMStatus:
-    def __init__(self, profile, vm_type="basic"):
+    def __init__(self, profile, vm_type="subprocess"):
         self.profile = profile
-        self.vm_type = vm_type  # "basic" or "xcpng" (0.1.19 multi-VM types)
+        self.vm_type = vm_type  # "subprocess" or "xen"
         self.running = False
         self.attached = False
         self.pid = None
         self.created_at = datetime.now()
         self.packages_installed = 0
-        # XCP-ng specific fields (Phase 1 placeholder support)
-        self.xcpng_config = {} if vm_type == "xcpng" else None
+        # Xen-specific fields
+        self.xen_config = {} if vm_type == "xen" else None
 
     def get_uptime(self) -> str:
         delta = datetime.now() - self.created_at
@@ -61,9 +61,8 @@ class VMCLI:
         self.vm_manager = VMManager()
         self.vm_status = {}
         
-        # Initialize 0.1.19 curator system with PackageInstaller
+        # Initialize curator system
         self.curator = get_curator()
-        self.package_installer = PackageInstaller()
         self.env_manager = EnvironmentManager()
 
     def main_menu(self):
@@ -105,23 +104,18 @@ class VMCLI:
                 sys.exit(0)
 
     def create_lua_vm(self):
-        # Step 1: Choose VM type using 0.1.19 multi-VM factory pattern
+        # Step 1: Choose VM type
         vm_type = questionary.select(
             "Select VM type:",
             choices=[
-                Choice("🐍 Basic VM (subprocess-based, default)", "basic"),
-                Choice("🌐 XCP-ng VM (hypervisor, Phase 1 placeholder)", "xcpng"),
+                Choice("🐍 Subprocess VM (Standard Lua process)", "subprocess"),
+                Choice("🌐 Xen VM (Full hypervisor virtualization)", "xen"),
                 Choice("← Back to Menu", "back")
             ]
         ).ask()
         
         if not vm_type or vm_type == "back":
             return
-
-        # Additional configuration options for 0.1.19
-        networked = questionary.confirm("Enable networking capabilities?", default=False).ask()
-        persistent = questionary.confirm("Enable persistent sessions?", default=True).ask()
-        debug_mode = questionary.confirm("Enable debug mode?", default=False).ask()
 
         vm_id = questionary.text(
             "Enter VM ID (unique identifier):",
@@ -137,101 +131,48 @@ class VMCLI:
         if not profile_name:
             profile_name = "standard"
 
-        config = None
-        if vm_type == "xcpng":
-            # Collect XCP-ng configuration for Phase 1 placeholder
-            config = {
-                "xcpng_host": questionary.text("XCP-ng host IP:", default="192.168.1.100").ask(),
-                "username": questionary.text("Username:", default="root").ask(),
-                "password": questionary.password("Password:").ask(),
-                "template": questionary.text("Template name:", default="lua-bio-template").ask()
-            }
+        if vm_type == "subprocess":
+            self._create_subprocess_vm(vm_id, profile_name)
+        elif vm_type == "xen":
+            self._create_xen_vm(vm_id, profile_name)
 
-        if vm_type == "basic":
-            self._create_basic_vm(vm_id, profile_name, networked, persistent, debug_mode)
-        elif vm_type == "xcpng":
-            self._create_xcpng_vm(vm_id, profile_name, config, networked, persistent, debug_mode)
-
-    def _create_basic_vm(self, vm_id, profile_name, networked=False, persistent=True, debug_mode=False):
-        """Create basic VM using 0.1.19 factory pattern"""
+    def _create_subprocess_vm(self, vm_id, profile_name):
+        """Create standard subprocess-based VM"""
         try:
-            print(f"🔄 Creating Basic VM '{vm_id}' with profile '{profile_name}'...")
-            
-            # Use 0.1.19 create_vm factory function
-            vm_instance = create_vm(
-                vm_id=vm_id, 
-                vm_type="basic", 
-                networked=networked, 
-                persistent=persistent, 
-                debug_mode=debug_mode
-            )
+            print(f"🔄 Creating Subprocess VM '{vm_id}' with profile '{profile_name}'...")
             
             # Create interactive session
             session = self.vm_manager.create_interactive_vm(vm_id)
             
             # Track VM status
-            self.vm_status[vm_id] = VMStatus(profile_name, "basic")
+            self.vm_status[vm_id] = VMStatus(profile_name, "subprocess")
             self.vm_status[vm_id].running = True
 
-            print(f"✅ Basic VM '{vm_id}' created with profile '{profile_name}'")
-            print("💡 Use 'Attach to existing VM' to interact with this VM")
-            print("-" * 70)
-
-            # Mark as attached and enter interactive mode if requested
-            attach_now = questionary.confirm("Attach to VM now?", default=True).ask()
-            if attach_now:
-                self.vm_status[vm_id].attached = True
-                
-                # Send welcome message
-                welcome_msg = f"""
--- Basic VM '{vm_id}' started with {profile_name} profile
-print('🌙 VM ready! Type Lua commands or exit to return to menu')
-"""
-                self.vm_manager.send_input(vm_id, welcome_msg)
-                time.sleep(0.2)
-                
-                print("Entering interactive session...")
-                self._interactive_loop(vm_id)
-                
-                self.vm_status[vm_id].attached = False
-
+            print(f"✅ Subprocess VM '{vm_id}' created successfully. Use the 'Attach' option to connect to it.")
+            
         except Exception as e:
-            print(f"❌ Failed to create basic VM: {e}")
+            print(f"❌ Failed to create subprocess VM: {e}")
             if vm_id in self.vm_status:
                 del self.vm_status[vm_id]
 
-    def _create_xcpng_vm(self, vm_id, profile_name, config, networked=False, persistent=True, debug_mode=False):
-        """Create XCP-ng VM using 0.1.19 Phase 1 placeholder"""
+    def _create_xen_vm(self, vm_id, profile_name):
+        """Create Xen hypervisor-based VM with configuration"""
+        print(f"🌐 Configuring Xen VM '{vm_id}'...")
+        
+        # Collect Xen-specific configuration
+        xen_config = self._collect_xen_config()
+        if not xen_config:
+            return
+        
         try:
-            print(f"🔄 Creating XCP-ng VM '{vm_id}' with profile '{profile_name}'...")
+            print(f"🔄 Creating Xen VM '{vm_id}' with profile '{profile_name}'...")
+            print("⚠️  Xen VM creation is a placeholder - actual implementation pending")
             
-            # Use 0.1.19 create_vm factory function with XCP-ng type
-            vm_instance = create_vm(
-                vm_id=vm_id, 
-                vm_type="xcpng", 
-                networked=networked, 
-                persistent=persistent, 
-                debug_mode=debug_mode,
-                config=config
-            )
+            # Track VM status with Xen config
+            self.vm_status[vm_id] = VMStatus(profile_name, "xen")
+            self.vm_status[vm_id].xen_config = xen_config
             
-            # Track VM status with XCP-ng config
-            self.vm_status[vm_id] = VMStatus(profile_name, "xcpng")
-            self.vm_status[vm_id].xcpng_config = config
-            
-            print(f"✅ XCP-ng VM '{vm_id}' configuration saved (Phase 1 placeholder)")
-            print(f"🔧 Host: {config['xcpng_host']}, Template: {config['template']}")
-            print("⚠️  Note: Actual XCP-ng VM creation will be implemented in Phase 2")
-            
-        except NotImplementedError as e:
-            print(f"⚠️  XCP-ng VM Phase 1 placeholder: {e}")
-            # Still track the VM for demonstration
-            self.vm_status[vm_id] = VMStatus(profile_name, "xcpng")
-            self.vm_status[vm_id].xcpng_config = config
-        except Exception as e:
-            print(f"❌ Failed to create XCP-ng VM: {e}")
-            if vm_id in self.vm_status:
-                del self.vm_status[vm_id]
+            # Placeholder: would create actual Xen VM here
             # self.vm_manager.create_xen_vm(vm_id, xen_config)
             
             print(f"✅ Xen VM '{vm_id}' configuration saved")
