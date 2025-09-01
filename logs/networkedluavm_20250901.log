@@ -1,0 +1,2 @@
+2025-09-01 14:03:55,362 - pylua_vm.networkedluavm - DEBUG - debug:195 - Cleaning up 0 temporary scripts and stopping interactive session
+2025-09-01 14:03:55,364 - pylua_vm.networkedluavm - DEBUG - debug:195 - Cleanup completed

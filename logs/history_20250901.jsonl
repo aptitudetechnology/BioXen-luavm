@@ -1,0 +1,5 @@
+{"timestamp": "2025-09-01T14:03:51.188938", "level": "DEBUG", "component": "LuaProcess", "message": "Initializing LuaProcess: name='2', executable='lua'", "context": {}, "duration": null}
+{"timestamp": "2025-09-01T14:03:51.189958", "level": "DEBUG", "component": "LuaProcess", "message": "Verifying Lua executable availability: 'lua'", "context": {}, "duration": null}
+{"timestamp": "2025-09-01T14:03:51.196824", "level": "DEBUG", "component": "LuaProcess", "message": "Lua verification successful: ", "context": {}, "duration": null}
+{"timestamp": "2025-09-01T14:03:55.364148", "level": "DEBUG", "component": "NetworkedLuaVM", "message": "Cleaning up 0 temporary scripts and stopping interactive session", "context": {}, "duration": null}
+{"timestamp": "2025-09-01T14:03:55.365131", "level": "DEBUG", "component": "NetworkedLuaVM", "message": "Cleanup completed", "context": {}, "duration": null}
