@@ -286,6 +286,15 @@ class VMCLI:
             # If no file config, check saved configurations
             if not config:
                 saved_configs = self.config_manager.get_xcpng_configs()
+                print(f"🐛 DEBUG: Found {len(saved_configs)} saved configurations")
+                for key, cfg in saved_configs.items():
+                    print(f"🐛 DEBUG: Config key: {key}")
+                    for config_key, config_value in cfg.items():
+                        if config_key.lower() in ['password']:
+                            print(f"  {config_key}: *** (hidden)")
+                        else:
+                            print(f"  {config_key}: {config_value}")
+                
                 if saved_configs:
                     if len(saved_configs) == 1:
                         host_key, saved_config = next(iter(saved_configs.items()))
@@ -295,6 +304,7 @@ class VMCLI:
                         ).ask()
                         if use_saved:
                             config = saved_config
+                            print(f"🐛 DEBUG: Using saved config for {host_key}")
                     else:
                         # Multiple configs - let user choose
                         choices = ["New configuration"] + [f"{key} ({cfg.get('template_name', 'unknown')})" for key, cfg in saved_configs.items()]
@@ -431,6 +441,36 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             # 0.1.22 uses the config directly - no conversion needed
             # The library expects: xapi_url, username, password, template_name, etc.
             
+            # DEBUG: Print the full config being passed to create_vm
+            print(f"🐛 DEBUG: Full config being passed to create_vm:")
+            for key, value in config.items():
+                if key.lower() in ['password']:
+                    print(f"  {key}: *** (hidden)")
+                else:
+                    print(f"  {key}: {value}")
+            print(f"🐛 DEBUG: VM creation parameters:")
+            print(f"  vm_id: {vm_id}")
+            print(f"  vm_type: xcpng")
+            print(f"  networked: {networked}")
+            print(f"  persistent: {persistent}")
+            print(f"  debug_mode: {debug_mode}")
+            
+            # WORKAROUND: Some older code might expect 'xcp_host' instead of 'xapi_url'
+            # Let's add both for compatibility
+            if 'xapi_url' in config and 'xcp_host' not in config:
+                config['xcp_host'] = config['xapi_url']
+                print(f"🐛 DEBUG: Added xcp_host for compatibility: {config['xcp_host']}")
+            elif 'xcp_host' in config and 'xapi_url' not in config:
+                config['xapi_url'] = config['xcp_host']
+                print(f"🐛 DEBUG: Added xapi_url for compatibility: {config['xapi_url']}")
+            
+            print(f"🐛 DEBUG: Final config after compatibility fixes:")
+            for key, value in config.items():
+                if key.lower() in ['password']:
+                    print(f"  {key}: *** (hidden)")
+                else:
+                    print(f"  {key}: {value}")
+            
             # Use 0.1.22 create_vm factory function with XCP-ng type
             vm_instance = create_vm(
                 vm_id=vm_id, 
@@ -466,6 +506,14 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
             
         except Exception as e:
             print(f"❌ Failed to create XCP-ng VM: {e}")
+            print(f"🐛 DEBUG: Exception type: {type(e).__name__}")
+            print(f"🐛 DEBUG: Exception details: {str(e)}")
+            
+            # Try to get more specific error information
+            import traceback
+            print(f"🐛 DEBUG: Full traceback:")
+            traceback.print_exc()
+            
             print("💡 Check XCP-ng host connectivity and credentials")
             host_display = config.get('xapi_url', config.get('xcp_host', 'Unknown'))
             template_name = config.get('template_name', 'unknown')
