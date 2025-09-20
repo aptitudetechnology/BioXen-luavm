@@ -464,6 +464,17 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
                 config['xapi_url'] = config['xcp_host']
                 print(f"🐛 DEBUG: Added xapi_url for compatibility: {config['xapi_url']}")
             
+            # WORKAROUND: Fix URL parsing - library expects just hostname, not full URL
+            if 'xcp_host' in config and config['xcp_host'].startswith('https://'):
+                # Extract just the hostname:port from the full URL
+                import re
+                url_parts = re.match(r'https://([^/]+)', config['xcp_host'])
+                if url_parts:
+                    hostname_port = url_parts.group(1)
+                    config['xcp_host'] = hostname_port
+                    config['xapi_url'] = hostname_port  # Update both
+                    print(f"🐛 DEBUG: Fixed URL format - extracted hostname: {hostname_port}")
+            
             # WORKAROUND: Library expects 'xcp_username' instead of 'username'
             if 'username' in config and 'xcp_username' not in config:
                 config['xcp_username'] = config['username']
