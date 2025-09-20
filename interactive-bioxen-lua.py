@@ -206,6 +206,7 @@ class VMCLI:
                     Choice("⚙️  Configuration Settings", "config_settings"),
                     Choice("🔧 Convert VM to Physical", "convert_vm"),
                     Choice("🖥️  Environment Status", "env_status"),
+                    Choice("🧪 Run Library Tests", "run_tests"),
                     Choice("📋 List VMs", "list_vms"),
                     Choice("🛑 Stop VM", "stop_vm"),
                     Choice("❌ Exit", "exit")
@@ -226,6 +227,8 @@ class VMCLI:
                 self.convert_vm_to_physical()
             elif action == "env_status":
                 self.show_environment_status()
+            elif action == "run_tests":
+                self.run_library_tests()
             elif action == "list_vms":
                 self.list_vms()
             elif action == "stop_vm":
@@ -1215,6 +1218,143 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
         except Exception as e:
             print(f"  ❌ Health check error: {e}")
         
+        questionary.press_any_key_to_continue().ask()
+
+    def run_library_tests(self):
+        """Run comprehensive tests of the pylua_bioxen_vm_lib library"""
+        print("\n🧪 Running Library Tests...")
+        print("=" * 60)
+        
+        test_results = {
+            'passed': 0,
+            'failed': 0,
+            'errors': []
+        }
+        
+        # Test 1: Basic VM Creation
+        print("\n1️⃣  Testing Basic VM Creation...")
+        try:
+            vm = create_vm("test_vm_basic")
+            result = vm.execute_string('print("Hello from Lua!")')
+            if result and 'stdout' in result and 'Hello from Lua!' in str(result['stdout']):
+                print("   ✅ Basic VM creation: PASSED")
+                test_results['passed'] += 1
+            else:
+                print(f"   ❌ Basic VM creation: FAILED - Unexpected output: {result}")
+                test_results['failed'] += 1
+                test_results['errors'].append("Basic VM: Unexpected output format")
+            
+            # Clean up
+            if hasattr(vm, 'cleanup'):
+                vm.cleanup()
+        except Exception as e:
+            print(f"   ❌ Basic VM creation: FAILED - {e}")
+            test_results['failed'] += 1
+            test_results['errors'].append(f"Basic VM: {str(e)}")
+        
+        # Test 2: Networked VM Creation
+        print("\n2️⃣  Testing Networked VM Creation...")
+        try:
+            net_vm = create_vm("test_vm_networked", networked=True)
+            print("   ✅ Networked VM creation: PASSED")
+            test_results['passed'] += 1
+            
+            # Clean up
+            if hasattr(net_vm, 'cleanup'):
+                net_vm.cleanup()
+        except Exception as e:
+            print(f"   ❌ Networked VM creation: FAILED - {e}")
+            test_results['failed'] += 1
+            test_results['errors'].append(f"Networked VM: {str(e)}")
+        
+        # Test 3: VM Manager Context
+        print("\n3️⃣  Testing VM Manager Context...")
+        try:
+            with VMManager() as manager:
+                vm = manager.create_vm("test_vm_managed")
+                result = manager.execute_vm_sync("test_vm_managed", 'print("Square root of 16 is:", math.sqrt(16))')
+                if result and 'stdout' in result:
+                    print("   ✅ VM Manager context: PASSED")
+                    test_results['passed'] += 1
+                else:
+                    print(f"   ❌ VM Manager context: FAILED - No output received")
+                    test_results['failed'] += 1
+                    test_results['errors'].append("VM Manager: No output received")
+        except Exception as e:
+            print(f"   ❌ VM Manager context: FAILED - {e}")
+            test_results['failed'] += 1
+            test_results['errors'].append(f"VM Manager: {str(e)}")
+        
+        # Test 4: Async Execution
+        print("\n4️⃣  Testing Async Execution...")
+        try:
+            with VMManager() as manager:
+                vm = manager.create_vm("test_vm_async")
+                future = manager.execute_vm_async("test_vm_async", 'print("Async execution works!")')
+                result = future.result(timeout=10)  # Wait up to 10 seconds
+                if result and 'stdout' in result:
+                    print("   ✅ Async execution: PASSED")
+                    test_results['passed'] += 1
+                else:
+                    print(f"   ❌ Async execution: FAILED - No output received")
+                    test_results['failed'] += 1
+                    test_results['errors'].append("Async execution: No output received")
+        except Exception as e:
+            print(f"   ❌ Async execution: FAILED - {e}")
+            test_results['failed'] += 1
+            test_results['errors'].append(f"Async execution: {str(e)}")
+        
+        # Test 5: Curator System
+        print("\n5️⃣  Testing Curator System...")
+        try:
+            health = self.curator.health_check()
+            if health and isinstance(health, dict):
+                print("   ✅ Curator health check: PASSED")
+                test_results['passed'] += 1
+            else:
+                print(f"   ❌ Curator health check: FAILED - Invalid health data")
+                test_results['failed'] += 1
+                test_results['errors'].append("Curator: Invalid health check response")
+        except Exception as e:
+            print(f"   ❌ Curator health check: FAILED - {e}")
+            test_results['failed'] += 1
+            test_results['errors'].append(f"Curator: {str(e)}")
+        
+        # Test 6: Environment Manager
+        print("\n6️⃣  Testing Environment Manager...")
+        try:
+            errors = self.env_manager.validate_environment()
+            if isinstance(errors, list):
+                print(f"   ✅ Environment validation: PASSED ({len(errors)} issues found)")
+                test_results['passed'] += 1
+            else:
+                print(f"   ❌ Environment validation: FAILED - Invalid response type")
+                test_results['failed'] += 1
+                test_results['errors'].append("Environment Manager: Invalid validation response")
+        except Exception as e:
+            print(f"   ❌ Environment validation: FAILED - {e}")
+            test_results['failed'] += 1
+            test_results['errors'].append(f"Environment Manager: {str(e)}")
+        
+        # Display final results
+        print("\n" + "=" * 60)
+        print("📊 TEST RESULTS SUMMARY")
+        print("=" * 60)
+        print(f"✅ Passed: {test_results['passed']}")
+        print(f"❌ Failed: {test_results['failed']}")
+        print(f"📈 Success Rate: {(test_results['passed'] / (test_results['passed'] + test_results['failed']) * 100):.1f}%")
+        
+        if test_results['errors']:
+            print(f"\n🚨 Error Details:")
+            for i, error in enumerate(test_results['errors'], 1):
+                print(f"   {i}. {error}")
+        
+        if test_results['failed'] == 0:
+            print(f"\n🎉 All tests passed! Library is working correctly.")
+        else:
+            print(f"\n⚠️  Some tests failed. Check the errors above for details.")
+        
+        print("\n💡 Tip: If tests fail, check your Python environment and library installation.")
         questionary.press_any_key_to_continue().ask()
 
 
