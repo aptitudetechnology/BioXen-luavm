@@ -464,9 +464,39 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
                 config['xapi_url'] = config['xcp_host']
                 print(f"🐛 DEBUG: Added xapi_url for compatibility: {config['xapi_url']}")
             
+            # WORKAROUND: Library expects 'xcp_username' instead of 'username'
+            if 'username' in config and 'xcp_username' not in config:
+                config['xcp_username'] = config['username']
+                print(f"🐛 DEBUG: Added xcp_username for compatibility: {config['xcp_username']}")
+            elif 'xcp_username' in config and 'username' not in config:
+                config['username'] = config['xcp_username']
+                print(f"🐛 DEBUG: Added username for compatibility: {config['username']}")
+            
+            # WORKAROUND: Library expects 'xcp_password' instead of 'password'
+            if 'password' in config and 'xcp_password' not in config:
+                config['xcp_password'] = config['password']
+                print(f"🐛 DEBUG: Added xcp_password for compatibility")
+            elif 'xcp_password' in config and 'password' not in config:
+                config['password'] = config['xcp_password']
+                print(f"🐛 DEBUG: Added password for compatibility")
+            
+            # WORKAROUND: Library might expect 'vm_username' instead of 'ssh_user'
+            if 'ssh_user' in config and 'vm_username' not in config:
+                config['vm_username'] = config['ssh_user']
+                print(f"🐛 DEBUG: Added vm_username for compatibility: {config['vm_username']}")
+            elif 'vm_username' in config and 'ssh_user' not in config:
+                config['ssh_user'] = config['vm_username']
+                print(f"🐛 DEBUG: Added ssh_user for compatibility: {config['ssh_user']}")
+            
+            # WORKAROUND: If ssh_key_path is empty but vm_password is expected, we might need vm_password
+            if 'ssh_key_path' in config and not config['ssh_key_path'] and 'vm_password' not in config:
+                # For now, use the same password for VM access if no SSH key
+                config['vm_password'] = config.get('password', config.get('xcp_password', ''))
+                print(f"🐛 DEBUG: Added vm_password for VM SSH access (no key provided)")
+            
             print(f"🐛 DEBUG: Final config after compatibility fixes:")
             for key, value in config.items():
-                if key.lower() in ['password']:
+                if key.lower() in ['password', 'xcp_password', 'vm_password']:
                     print(f"  {key}: *** (hidden)")
                 else:
                     print(f"  {key}: {value}")
