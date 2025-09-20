@@ -512,6 +512,13 @@ print('🌙 VM ready! Type Lua commands or exit to return to menu')
                 else:
                     print(f"  {key}: {value}")
             
+            # DEBUG: Test the URL format by showing what the library will try to connect to
+            hostname = config.get('xcp_host', config.get('xapi_url', 'unknown'))
+            print(f"🐛 DEBUG: Library will attempt to connect to:")
+            print(f"  Full URL: https://{hostname}/api/session")
+            print(f"  Host: {hostname}")
+            print(f"  Username: {config.get('xcp_username', config.get('username', 'unknown'))}")
+            
             # Use 0.1.22 create_vm factory function with XCP-ng type
             vm_instance = create_vm(
                 vm_id=vm_id, 
