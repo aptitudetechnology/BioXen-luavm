@@ -85,6 +85,44 @@ Comprehensive endpoint testing was performed on XCP-ng host `192.168.1.198:443`:
 - Authentication with `session.login_with_password` succeeds
 - VM operations via XML-RPC are functional
 
+### XCP-ng Configuration Analysis
+
+**Question: Is this a configuration issue rather than a protocol mismatch?**
+
+**Evidence suggesting this is NOT a configuration issue:**
+
+1. **XCP-ng Server is Responding Correctly:**
+   - Root path (`/`) returns HTTP 200 ✅
+   - Server identifies as "Xapi Server" in error messages ✅
+   - HTTPS/SSL handshake completes successfully ✅
+   - XML-RPC endpoint is accessible and functional ✅
+
+2. **Standard XCP-ng Behavior:**
+   - XCP-ng/Citrix Hypervisor has NEVER used `/api/session` endpoints
+   - The Xen API (XAPI) is exclusively XML-RPC based by design
+   - `/api/session` is a modern REST API pattern not used by XCP-ng
+   - All XCP-ng documentation shows XML-RPC examples on root path
+
+3. **Server Response Analysis:**
+   ```html
+   <hr><address>Xapi Server</address>
+   ```
+   This confirms the server is running XAPI (Xen API) which is XML-RPC only.
+
+**What would indicate a configuration issue:**
+- ❌ No response from server (connection refused)
+- ❌ SSL/TLS errors
+- ❌ Authentication failures with correct XML-RPC format
+- ❌ XML-RPC returning HTTP 500 for valid calls
+
+**What we actually see (indicating correct configuration):**
+- ✅ Server responds to all requests
+- ✅ Proper error messages for non-existent endpoints
+- ✅ HTTP 200 for root path
+- ✅ XML-RPC parser errors only when library sends wrong format
+
+**Conclusion:** The XCP-ng server is properly configured and functioning normally. The issue is that the library expects a REST API that XCP-ng simply doesn't provide by design.
+
 ## Detailed Error Trace
 
 ```

@@ -212,17 +212,17 @@ main() {
         "ubuntu")
             install_lua_ubuntu
             print_status "Installing Xen and libvirt dependencies on Ubuntu/Debian..."
-            sudo apt install -y libvirt-dev xen-tools xen-hypervisor
+            sudo apt install -y libvirt-dev 
             ;;
         "centos")
             install_lua_centos
             print_status "Installing Xen and libvirt dependencies on CentOS/RHEL..."
-            sudo yum install -y libvirt-devel xen xen-tools
+            sudo yum install -y libvirt-devel 
             ;;
         "fedora")
             install_lua_fedora
             print_status "Installing Xen and libvirt dependencies on Fedora..."
-            sudo dnf install -y libvirt-devel xen xen-tools
+            sudo dnf install -y libvirt-devel 
             ;;
         "macos")
             install_lua_macos
